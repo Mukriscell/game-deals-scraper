@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Suscripciones – GAMEDEALS{% endblock %}
+{% block tagline %}Streaming, Gaming Pass y juegos en suscripción · {{ stats.total }} servicios{% endblock %}
+
+{% macro service_card(svc) %}
+<a href="{{ svc.url }}" target="_blank" rel="noopener" class="card card--streaming">
+  <div class="streaming-header" style="background:{{ svc.color }}">
+    <span class="streaming-name" style="color:{{ svc.text_color }}">{{ svc.title }}</span>
+  </div>
+  {% if svc.category == 'gaming' %}
+  <div class="badge badge--gaming">🎮 GAMING PASS</div>
+  {% else %}
+  <div class="badge badge--streaming">▶ STREAMING</div>
+  {% endif %}
+  <div class="card-body">
+    <div class="card-name">{{ svc.title }}</div>
+    <div class="streaming-desc">{{ svc.description }}</div>
+    <div class="streaming-plans">
+      {% for plan in svc.plans %}
+      <div class="plan-row">
+        <span class="plan-name">{{ plan.name }}</span>
+        <span class="plan-price" data-usd="{{ plan.price }}">
+          {{ plan.currency }} {{ "%.2f"|format(plan.price) }}
+          <span class="plan-period">/mes</span>
+        </span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="streaming-footer">Ver planes →</div>
+</a>
+{% endmacro %}
+
+{% block main %}
+
+  <div class="category-bar">
+    <div class="category-label">
+      <span>♾</span>
+      <span>Suscripciones</span>
+    </div>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-num">{{ stats.total }}</span>
+        <span class="stat-label">Servicios</span>
+      </div>
+    </div>
+  </div>
+
+  {% if streaming %}
+  <div class="sub-section-hdr">▶ Servicios de <span class="accent">Streaming</span></div>
+  <div class="sub-service-grid">
+    {% for svc in streaming %}{{ service_card(svc) }}{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if gaming %}
+  <div class="sub-section-hdr">🎮 Gaming <span class="accent">Pass</span></div>
+  <div class="sub-service-grid">
+    {% for svc in gaming %}{{ service_card(svc) }}{% endfor %}
+  </div>
+  {% endif %}
+
+  {% if subscriptions %}
+  <div class="sub-section-hdr">♾ Juegos en <span class="accent">Suscripción</span></div>
+  <div class="deals-grid">
+    {% for game in subscriptions %}
+    <a href="{{ game.itad_url }}" target="_blank" rel="noopener" class="card card--sub">
+      <div class="card-thumb">
+        <img src="{{ game.banner }}" alt="{{ game.title }}" loading="lazy"
+             onerror="this.parentElement.classList.add('card-thumb--empty');this.remove()"/>
+      </div>
+      <div class="badge badge--sub">♾ SUSCRIPCIÓN</div>
+      <div class="card-body">
+        <div class="card-name">{{ game.title }}</div>
+        <div class="sub-badges">
+          {% for s in game.subs %}
+          <span class="sub-badge">{{ s.name }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if not streaming and not gaming and not subscriptions %}
+  <div class="empty-state" style="display:flex">
+    <div class="empty-icon">♾</div>
+    <p>No se encontraron suscripciones disponibles.</p>
+  </div>
+  {% endif %}
+
+{% endblock %}

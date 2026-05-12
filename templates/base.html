@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{% block title %}GAMEDEALS{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/style.css"/>
+  {% block head %}{% endblock %}
+</head>
+<body>
+
+  <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">🎮 <span class="accent">Categorías</span></span>
+      <button class="sidebar-close" id="sidebar-close" aria-label="Cerrar">✕</button>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/games" class="sidebar-item {% if page == 'game' %}sidebar-item--active{% endif %}">
+        <span class="sidebar-icon">🎮</span>
+        <span class="sidebar-label">Juegos</span>
+        <span class="sidebar-count">{{ stats.games }}</span>
+      </a>
+      <a href="/licencias" class="sidebar-item {% if page == 'license' %}sidebar-item--active{% endif %}">
+        <span class="sidebar-icon">🔑</span>
+        <span class="sidebar-label">Licencias</span>
+        <span class="sidebar-count">{{ stats.licenses }}</span>
+      </a>
+      <a href="/suscripciones" class="sidebar-item {% if page == 'subscription' %}sidebar-item--active{% endif %}">
+        <span class="sidebar-icon">♾</span>
+        <span class="sidebar-label">Suscripciones</span>
+        <span class="sidebar-count">{{ stats.total_subs }}</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <p>Datos via <a href="https://isthereanydeal.com" target="_blank">ITAD</a></p>
+    </div>
+  </aside>
+
+  <header>
+    <div class="header-inner">
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Abrir menú">
+        <span></span><span></span><span></span>
+      </button>
+      <div class="header-brand">
+        <div class="logo">🎮 GAME<span class="accent">DEALS</span></div>
+        <p class="tagline">{% block tagline %}{% endblock %}</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    {% block main %}{% endblock %}
+  </main>
+
+  <footer>
+    <p>Datos via <a href="https://isthereanydeal.com" target="_blank">IsThereAnyDeal API</a> · Cada tarjeta te lleva directo a la tienda · <strong>GAMEDEALS</strong></p>
+  </footer>
+
+  <!-- Currency widget -->
+  <div class="cx-widget" id="gd-cx-widget">
+    <button class="cx-btn" id="gd-cx-btn" title="Cambiar moneda">
+      <span class="cx-btn-icon">💱</span>
+      <span class="cx-btn-code" id="gd-cx-code">USD</span>
+      <span class="cx-chevron">▾</span>
+    </button>
+    <div class="cx-panel" id="gd-cx-panel">
+      <div class="cx-panel-hdr">Moneda</div>
+      <div class="cx-list" id="gd-cx-list"></div>
+      <div class="cx-panel-footer">via ExchangeRate-API</div>
+    </div>
+  </div>
+  <script src="/static/currency.js"></script>
+
+  <script>
+    (function () {
+      const sidebar   = document.getElementById('sidebar');
+      const backdrop  = document.getElementById('sidebar-backdrop');
+      const btnToggle = document.getElementById('sidebar-toggle');
+      const btnClose  = document.getElementById('sidebar-close');
+      function open()  { sidebar.classList.add('sidebar--open'); backdrop.classList.add('backdrop--visible'); }
+      function close() { sidebar.classList.remove('sidebar--open'); backdrop.classList.remove('backdrop--visible'); }
+      btnToggle.addEventListener('click', open);
+      btnClose.addEventListener('click', close);
+      backdrop.addEventListener('click', close);
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+
+  {% block scripts %}{% endblock %}
+
+</body>
+</html>

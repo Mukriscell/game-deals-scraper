@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Juegos – GAMEDEALS{% endblock %}
+{% block tagline %}{{ stats.games }} ofertas · Steam · GOG · Epic · Humble · EA · Ubisoft y más{% endblock %}
+
+{% block main %}
+
+  <!-- Carrusel -->
+  {% if featured %}
+  <section class="carousel-section">
+    <h2 class="section-title">Juegos <span class="accent">Populares</span></h2>
+    <div class="carousel" id="carousel">
+      <div class="carousel-track" id="carousel-track">
+        {% for game in featured %}
+        <div class="carousel-slide">
+          <img class="carousel-bg" src="{{ game.banner }}" alt="{{ game.title }}"
+               onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('banner600','banner300')}else{this.style.display='none'}">
+          <div class="carousel-overlay"></div>
+          <div class="carousel-content">
+            <div class="carousel-meta">
+              {% if game.cut > 0 %}<span class="carousel-cut">-{{ game.cut }}%</span>{% endif %}
+              {% if game.store %}<span class="carousel-store">{{ game.store }}</span>{% endif %}
+              {% if game.on_sale and game.cut >= 70 %}<span class="carousel-hot">🔥 OFERTA</span>{% endif %}
+            </div>
+            <h3 class="carousel-title">{{ game.title }}</h3>
+            <div class="carousel-price-row">
+              {% if game.on_sale %}
+                {% if game.price == 0 %}
+                  <span class="carousel-free">GRATIS</span>
+                {% else %}
+                  <span class="carousel-price" data-usd="{{ game.price }}">{{ game.currency }} {{ "%.2f"|format(game.price) }}</span>
+                {% endif %}
+              {% endif %}
+              <a href="{{ game.url }}" target="_blank" rel="noopener" class="carousel-btn">
+                {% if game.on_sale %}Ver oferta{% else %}Ver en ITAD{% endif %}
+              </a>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      <button class="carousel-arrow carousel-arrow--prev" id="carousel-prev">&#8592;</button>
+      <button class="carousel-arrow carousel-arrow--next" id="carousel-next">&#8594;</button>
+      <div class="carousel-dots" id="carousel-dots">
+        {% for game in featured %}
+        <button class="carousel-dot{% if loop.first %} carousel-dot--active{% endif %}"></button>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Ofertas por tiempo limitado -->
+  <section class="daily-deals-section" id="daily-deals-section" style="display:none">
+    <h2 class="section-title">
+      ⏰ Ofertas <span class="accent">por Tiempo Limitado</span>
+      <span class="daily-deals-badge">Vencen en &lt;7 días</span>
+    </h2>
+    <div class="daily-deals-grid" id="daily-deals-grid"></div>
+  </section>
+
+  <!-- Stats + Label -->
+  <div class="category-bar">
+    <div class="category-label">
+      <span>🎮</span>
+      <span>Juegos</span>
+    </div>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-num" id="stat-visible">{{ stats.games }}</span>
+        <span class="stat-label">Mostrados</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">{{ stats.hot }}</span>
+        <span class="stat-label">🔥 70%+ off</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">{{ stats.free }}</span>
+        <span class="stat-label">🎁 Gratis</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls" id="controls">
+    <div class="search-wrapper">
+      <span class="search-icon">🔍</span>
+      <input type="text" id="search-input" class="search-input"
+             placeholder="Buscar juego..." autocomplete="off"/>
+      <button class="search-clear" id="search-clear" aria-label="Limpiar">✕</button>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
+    <div class="filter-group">
+      <label for="store-filter">Tienda</label>
+      <select id="store-filter">
+        <option value="All">Todas</option>
+        {% for s in stores %}
+        <option value="{{ s.id }}">{{ s.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label for="price-filter">Precio máx. (USD)</label>
+      <input type="number" id="price-filter" min="0" step="0.01" placeholder="Cualquiera"/>
+    </div>
+    <div class="filter-group">
+      <label for="sort-filter">Ordenar por</label>
+      <select id="sort-filter">
+        <option value="discount">Mayor descuento</option>
+        <option value="price_asc">Precio: menor a mayor</option>
+        <option value="price_desc">Precio: mayor a menor</option>
+        <option value="alpha">Alfabético A–Z</option>
+        <option value="alpha_desc">Alfabético Z–A</option>
+      </select>
+    </div>
+    <button class="btn-reset" id="btn-reset">↺ Reset</button>
+  </div>
+
+  <!-- Grid de juegos -->
+  <div class="deals-grid" id="deals-grid"></div>
+
+  <!-- Estado vacío -->
+  <div class="empty-state" id="empty-state" style="display:none">
+    <div class="empty-icon">🕹️</div>
+    <p>No se encontraron juegos con esos filtros.</p>
+    <button class="btn-reset" id="btn-reset2">Limpiar filtros</button>
+  </div>
+
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const ALL_DEALS = {{ deals_json | safe }};
+  </script>
+  <script src="/static/app.js"></script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Licencias – GAMEDEALS{% endblock %}
+{% block tagline %}Cursos, certificaciones, ebooks y software · {{ stats.total }} servicios{% endblock %}
+
+{% block main %}
+
+  <div class="category-bar">
+    <div class="category-label">
+      <span>🔑</span>
+      <span>Licencias</span>
+    </div>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-num">{{ stats.total }}</span>
+        <span class="stat-label">Servicios</span>
+      </div>
+    </div>
+  </div>
+
+  {% for cat_id in cat_order %}
+    {% if cat_map[cat_id] %}
+    <div class="sub-section-hdr">{{ cat_labels[cat_id] }}</div>
+    <div class="sub-service-grid">
+      {% for svc in cat_map[cat_id] %}
+      <a href="{{ svc.url }}" target="_blank" rel="noopener" class="card card--streaming">
+        <div class="streaming-header" style="background:{{ svc.color }}">
+          <span class="streaming-name" style="color:{{ svc.text_color }}">{{ svc.title }}</span>
+        </div>
+        <div class="badge badge--lic-{{ svc.category }}">
+          {% if svc.category == 'courses' %}🎓 CURSO
+          {% elif svc.category == 'ebooks' %}📖 EBOOK
+          {% else %}💻 SOFTWARE
+          {% endif %}
+        </div>
+        <div class="card-body">
+          <div class="card-name">{{ svc.title }}</div>
+          <div class="streaming-desc">{{ svc.description }}</div>
+          <div class="streaming-plans">
+            {% for plan in svc.plans %}
+            <div class="plan-row">
+              <span class="plan-name">{{ plan.name }}</span>
+              <span class="plan-price" data-usd="{{ plan.price }}">
+                {{ plan.currency }} {{ "%.2f"|format(plan.price) }}
+                <span class="plan-period">/mes</span>
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        <div class="streaming-footer">Ver planes →</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endfor %}
+
+{% endblock %}
