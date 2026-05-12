@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Panel – GAMEDEALS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body class="admin-body">
+
+  <!-- Header -->
+  <header class="admin-header">
+    <div class="admin-header-inner">
+      <div class="admin-brand">🎮 GAME<span class="accent">DEALS</span> <span class="admin-badge">ADMIN</span></div>
+      <div class="admin-header-right">
+        <span class="admin-header-email">{{ admin_email }}</span>
+        <a href="/games" class="admin-btn admin-btn--outline" style="text-decoration:none">← Sitio</a>
+        <form method="POST" action="/admin/logout" style="display:inline">
+          <button class="admin-logout-btn" type="submit">🚪 Salir</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <!-- Tab navigation -->
+  <div class="admin-tabs">
+    <button class="admin-tab admin-tab--active" data-target="tab-overview">📊 Resumen</button>
+    <button class="admin-tab" data-target="tab-users">👥 Usuarios</button>
+    <button class="admin-tab" data-target="tab-content">🎮 Contenido</button>
+    <button class="admin-tab" data-target="tab-config">⚙️ Config</button>
+    <button class="admin-tab" data-target="tab-analytics">📈 Analítica</button>
+    <button class="admin-tab" data-target="tab-logs">📋 Logs</button>
+    <button class="admin-tab" data-target="tab-security">🔒 Seguridad</button>
+  </div>
+
+  <div class="admin-container">
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 1: RESUMEN
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-overview" class="admin-tab-panel admin-tab-panel--active">
+
+      <!-- Stats grid -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">📊 Resumen general</h2>
+        <div class="admin-stats-grid">
+          <div class="admin-stat-card">
+            <div class="admin-stat-num">{{ user_counts.total }}</div>
+            <div class="admin-stat-label">Usuarios registrados</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-num">{{ user_counts.active }}</div>
+            <div class="admin-stat-label">Cuentas activas</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-num">{{ active_sessions | length }}</div>
+            <div class="admin-stat-label">Sesiones últimas 60 min</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-num">{{ deals_count }}</div>
+            <div class="admin-stat-label">Deals en caché</div>
+          </div>
+          <div class="admin-stat-card {{ 'admin-stat-card--ok' if cache_age is not none and cache_age < cache_ttl else 'admin-stat-card--warn' }}">
+            <div class="admin-stat-num">
+              {% if cache_age is not none %}
+                {{ (cache_age // 60) | int }}m {{ (cache_age % 60) | int }}s
+              {% else %}—{% endif %}
+            </div>
+            <div class="admin-stat-label">Antigüedad caché · TTL {{ cache_ttl // 60 }}min</div>
+          </div>
+          <div class="admin-stat-card">
+            <div class="admin-stat-num">{{ user_counts.moderators }}</div>
+            <div class="admin-stat-label">Moderadores</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- API status -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🔑 Estado de APIs</h2>
+        <div class="admin-api-grid">
+          {% for name, info in api_status.items() %}
+          <div class="admin-api-card {{ 'admin-api-ok' if info.configured and info.enabled else ('admin-api-warn' if info.configured else 'admin-api-fail') }}">
+            <span class="admin-api-indicator">
+              {{ '✅' if info.configured and info.enabled else ('⚠️' if info.configured else '❌') }}
+            </span>
+            <div class="admin-api-info">
+              <span class="admin-api-name">{{ name }}</span>
+              <span class="admin-api-state">
+                {{ 'Activa' if info.configured and info.enabled else ('Desactivada' if info.configured else 'Sin configurar') }}
+              </span>
+              {% if info.count != '—' %}
+              <span class="admin-api-count">{{ info.count }} deals</span>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Cache control -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🔄 Control de caché</h2>
+        <div class="admin-cache-row">
+          <div class="admin-cache-info">
+            <p>TTL configurado: <strong>{{ cache_ttl // 60 }} minutos</strong></p>
+            <p>Última actualización:
+              {% if cache_age is not none %}
+                <strong>hace {{ (cache_age // 60) | int }}m {{ (cache_age % 60) | int }}s</strong>
+              {% else %}<strong>Sin datos</strong>{% endif %}
+            </p>
+            <p>Deals en memoria: <strong>{{ deals_count }}</strong></p>
+          </div>
+          <form method="POST" action="/admin/cache/refresh">
+            <button class="admin-btn admin-btn--primary" type="submit">⟳ Forzar actualización</button>
+          </form>
+        </div>
+      </section>
+
+    </div><!-- /tab-overview -->
+
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 2: USUARIOS
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-users" class="admin-tab-panel">
+
+      <!-- Active sessions -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🟢 Sesiones activas (últimos 60 min)</h2>
+        {% if active_sessions %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Email</th><th>Rol</th><th>Última actividad</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+              {% for s in active_sessions %}
+              <tr>
+                <td>{{ s.email }}</td>
+                <td><span class="admin-role-badge admin-role-{{ s.role }}">{{ s.role }}</span></td>
+                <td>{{ s.last_seen }}</td>
+                <td>
+                  <form method="POST" action="/admin/users/{{ s.id }}/toggle">
+                    <input type="hidden" name="page" value="{{ user_page }}"/>
+                    <button class="admin-btn admin-btn--warn" type="submit">Banear</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty">No hay sesiones activas en los últimos 60 minutos.</p>
+        {% endif %}
+      </section>
+
+      <!-- Users table -->
+      <section class="admin-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+          <h2 class="admin-section-title" style="margin-bottom:0">👥 Todos los usuarios</h2>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <span style="font-size:.78rem;color:#5a6270">{{ user_total }} usuarios · pág. {{ user_page }}/{{ user_total_pages }}</span>
+            <a href="/admin/users/export" class="admin-btn admin-btn--outline" style="text-decoration:none">⬇ CSV</a>
+          </div>
+        </div>
+
+        {% if users %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>ID</th><th>Email</th><th>Registro</th><th>Última sesión</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr>
+            </thead>
+            <tbody>
+              {% for u in users %}
+              <tr class="{{ 'admin-row-inactive' if not u.is_active else '' }}">
+                <td>{{ u.id }}</td>
+                <td>{{ u.email }}</td>
+                <td>{{ u.created_at }}</td>
+                <td>{{ u.last_seen or '—' }}</td>
+                <td>
+                  <form method="POST" action="/admin/users/{{ u.id }}/role" style="display:inline">
+                    <input type="hidden" name="page" value="{{ user_page }}"/>
+                    <select name="role" onchange="this.form.submit()" class="admin-select">
+                      <option value="user"      {{ 'selected' if u.role == 'user' }}>User</option>
+                      <option value="moderator" {{ 'selected' if u.role == 'moderator' }}>Moderador</option>
+                    </select>
+                  </form>
+                </td>
+                <td>
+                  {% if u.is_active %}
+                    <span class="admin-status admin-status--active">Activo</span>
+                  {% else %}
+                    <span class="admin-status admin-status--banned">Baneado</span>
+                  {% endif %}
+                </td>
+                <td class="admin-actions">
+                  <form method="POST" action="/admin/users/{{ u.id }}/toggle">
+                    <input type="hidden" name="page" value="{{ user_page }}"/>
+                    <button class="admin-btn {{ 'admin-btn--warn' if u.is_active else 'admin-btn--ok' }}" type="submit">
+                      {{ 'Banear' if u.is_active else 'Activar' }}
+                    </button>
+                  </form>
+                  <form method="POST" action="/admin/users/{{ u.id }}/delete"
+                        onsubmit="return confirm('¿Eliminar {{ u.email | e }}? No se puede deshacer.')">
+                    <input type="hidden" name="page" value="{{ user_page }}"/>
+                    <button class="admin-btn admin-btn--danger" type="submit">Eliminar</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        {% if user_total_pages > 1 %}
+        <div class="admin-pagination">
+          {% if user_page > 1 %}
+            <a href="?page={{ user_page - 1 }}#tab-users" class="admin-btn admin-btn--outline">← Anterior</a>
+          {% endif %}
+          <span>{{ user_page }} / {{ user_total_pages }}</span>
+          {% if user_page < user_total_pages %}
+            <a href="?page={{ user_page + 1 }}#tab-users" class="admin-btn admin-btn--outline">Siguiente →</a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% else %}
+          <p class="admin-empty">No hay usuarios registrados aún.</p>
+        {% endif %}
+      </section>
+
+    </div><!-- /tab-users -->
+
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 3: CONTENIDO
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-content" class="admin-tab-panel">
+
+      <!-- Maintenance mode -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🔧 Modo mantenimiento</h2>
+        <form method="POST" action="/admin/config">
+          <input type="hidden" name="_section" value="maintenance"/>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Activar mantenimiento</label>
+            <label class="admin-toggle">
+              <input type="checkbox" name="maintenance_mode" value="1"
+                     {{ 'checked' if config.get('maintenance_mode') == '1' }}>
+              <span class="admin-toggle-slider"></span>
+            </label>
+            <span class="admin-form-hint">Todos los visitantes verán la página de mantenimiento</span>
+          </div>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Mensaje a mostrar</label>
+            <textarea name="maintenance_msg" class="admin-input admin-textarea" rows="2"
+                      style="width:100%;max-width:520px">{{ config.get('maintenance_msg', '') }}</textarea>
+          </div>
+          <button type="submit" class="admin-btn admin-btn--primary">Guardar</button>
+        </form>
+        {% if config.get('maintenance_mode') == '1' %}
+        <div class="admin-info-box admin-info-box--warn" style="margin-top:.9rem">
+          ⚠️ <strong>Mantenimiento activo.</strong>
+          Los visitantes ven la página de mantenimiento.
+          Como administrador, tú sigues viendo el sitio normal.
+          <a href="/games" target="_blank" style="color:var(--accent);margin-left:.3rem">Verificar en nueva pestaña →</a>
+        </div>
+        {% endif %}
+      </section>
+
+      <!-- Global banner -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">📢 Banner global</h2>
+        <form method="POST" action="/admin/config">
+          <input type="hidden" name="_section" value="banner"/>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Mostrar banner</label>
+            <label class="admin-toggle">
+              <input type="checkbox" name="banner_active" value="1"
+                     {{ 'checked' if config.get('banner_active') == '1' }}>
+              <span class="admin-toggle-slider"></span>
+            </label>
+          </div>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Texto del banner</label>
+            <input type="text" name="banner_text" class="admin-input"
+                   style="width:100%;max-width:520px"
+                   value="{{ config.get('banner_text', '') }}"
+                   placeholder="Ej: 🎉 Nuevas ofertas de Steam disponibles hoy"/>
+          </div>
+          <button type="submit" class="admin-btn admin-btn--primary">Guardar</button>
+        </form>
+      </section>
+
+      <!-- Carousel pin -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">📌 Juego fijado en carrusel</h2>
+        <form method="POST" action="/admin/config">
+          <input type="hidden" name="_section" value="carousel"/>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Nombre exacto del juego</label>
+            <input type="text" name="carousel_pin" class="admin-input"
+                   style="width:100%;max-width:400px"
+                   value="{{ config.get('carousel_pin', '') }}"
+                   placeholder="Ej: Cyberpunk 2077"/>
+          </div>
+          <p class="admin-form-hint" style="margin-bottom:.8rem">Deja vacío para desactivar. El nombre debe coincidir exactamente con el título en el feed.</p>
+          <button type="submit" class="admin-btn admin-btn--primary">Guardar</button>
+        </form>
+      </section>
+
+      <!-- Blacklist -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🚫 Blacklist de títulos</h2>
+        <p class="admin-form-hint" style="margin-bottom:1rem">
+          Los juegos cuyos títulos contengan alguno de estos patrones serán ocultados del feed.
+          Se aplica en cada actualización del caché.
+        </p>
+
+        {% if blacklist %}
+        <div class="admin-table-wrap" style="margin-bottom:1.2rem">
+          <table class="admin-table">
+            <thead><tr><th>#</th><th>Patrón</th><th>Agregado</th><th></th></tr></thead>
+            <tbody>
+              {% for bl in blacklist %}
+              <tr>
+                <td>{{ bl.id }}</td>
+                <td><code style="background:rgba(255,255,255,.06);padding:2px 7px;border-radius:5px">{{ bl.pattern }}</code></td>
+                <td>{{ bl.ts }}</td>
+                <td>
+                  <form method="POST" action="/admin/blacklist/{{ bl.id }}/remove">
+                    <button class="admin-btn admin-btn--danger" type="submit">Eliminar</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty" style="margin-bottom:1rem">No hay patrones en la blacklist.</p>
+        {% endif %}
+
+        <form method="POST" action="/admin/blacklist/add" style="display:flex;gap:.6rem;flex-wrap:wrap">
+          <input type="text" name="pattern" class="admin-input" placeholder="ej: gambling, nft, bundle..."
+                 style="flex:1;min-width:200px" required/>
+          <button type="submit" class="admin-btn admin-btn--primary">+ Agregar patrón</button>
+        </form>
+      </section>
+
+    </div><!-- /tab-content -->
+
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 4: CONFIGURACIÓN
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-config" class="admin-tab-panel">
+
+      <!-- Sources & Cache TTL -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">⚙️ Fuentes y caché</h2>
+        <form method="POST" action="/admin/config">
+          <input type="hidden" name="_section" value="sources"/>
+          <div class="admin-form-row">
+            <label class="admin-form-label">SteamSpy</label>
+            <label class="admin-toggle">
+              <input type="checkbox" name="source_steamspy" value="1"
+                     {{ 'checked' if config.get('source_steamspy') == '1' }}>
+              <span class="admin-toggle-slider"></span>
+            </label>
+            <span class="admin-form-hint">Deals adicionales de SteamSpy (sin API key)</span>
+          </div>
+          <div class="admin-form-row">
+            <label class="admin-form-label">GG.deals</label>
+            <label class="admin-toggle">
+              <input type="checkbox" name="source_ggdeals" value="1"
+                     {{ 'checked' if config.get('source_ggdeals') == '1' }}>
+              <span class="admin-toggle-slider"></span>
+            </label>
+            <span class="admin-form-hint">Deals adicionales de GG.deals (requiere API key)</span>
+          </div>
+          <div class="admin-form-row">
+            <label class="admin-form-label">TTL del caché (segundos)</label>
+            <input type="number" name="cache_ttl" class="admin-input" min="60" max="3600" step="30"
+                   value="{{ config.get('cache_ttl', '300') }}" style="width:120px"/>
+            <span class="admin-form-hint">Mínimo 60s · Actual: {{ (config.get('cache_ttl', '300') | int) // 60 }} min</span>
+          </div>
+          <button type="submit" class="admin-btn admin-btn--primary">Guardar cambios</button>
+        </form>
+      </section>
+
+    </div><!-- /tab-config -->
+
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 5: ANALÍTICA
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-analytics" class="admin-tab-panel">
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:1.4rem">
+
+        <!-- Top searches -->
+        <section class="admin-section">
+          <h2 class="admin-section-title">🔍 Búsquedas más frecuentes</h2>
+          {% if top_searches %}
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Búsqueda</th><th>Veces</th></tr></thead>
+              <tbody>
+                {% for s in top_searches %}
+                <tr>
+                  <td>{{ s.query }}</td>
+                  <td><span class="admin-count-pill">{{ s.count }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p class="admin-empty">Sin datos aún. Los datos se registran cuando los usuarios buscan juegos.</p>
+          {% endif %}
+        </section>
+
+        <!-- Top clicked deals -->
+        <section class="admin-section">
+          <h2 class="admin-section-title">🖱 Deals más clickeados</h2>
+          {% if top_clicks %}
+          <div class="admin-table-wrap">
+            <table class="admin-table">
+              <thead><tr><th>Juego</th><th>Tienda</th><th>Clicks</th></tr></thead>
+              <tbody>
+                {% for c in top_clicks %}
+                <tr>
+                  <td>{{ c.deal_name }}</td>
+                  <td>{{ c.store }}</td>
+                  <td><span class="admin-count-pill">{{ c.count }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+            <p class="admin-empty">Sin datos aún. Los clicks se registran cuando los usuarios abren una oferta.</p>
+          {% endif %}
+        </section>
+
+        <!-- Store click distribution -->
+        <section class="admin-section">
+          <h2 class="admin-section-title">🏪 Tiendas por clicks</h2>
+          {% if store_stats %}
+          {% set max_count = store_stats[0].count %}
+          <div style="display:flex;flex-direction:column;gap:.55rem">
+            {% for s in store_stats %}
+            <div>
+              <div style="display:flex;justify-content:space-between;margin-bottom:.2rem;font-size:.82rem">
+                <span>{{ s.store }}</span>
+                <span style="color:#5a6270">{{ s.count }}</span>
+              </div>
+              <div style="background:rgba(255,255,255,.06);border-radius:4px;height:7px;overflow:hidden">
+                <div style="background:var(--accent);height:100%;width:{{ ((s.count / max_count) * 100) | int }}%;border-radius:4px"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+            <p class="admin-empty">Sin datos de clicks por tienda aún.</p>
+          {% endif %}
+        </section>
+
+      </div>
+    </div><!-- /tab-analytics -->
+
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 6: LOGS
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-logs" class="admin-tab-panel">
+
+      <!-- Cache history -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🔄 Historial de actualizaciones del caché</h2>
+        {% if cache_history %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr><th>Timestamp</th><th>Deals</th><th>Duración</th><th>ITAD</th><th>SteamSpy</th><th>GG.deals</th><th>Error</th></tr>
+            </thead>
+            <tbody>
+              {% for h in cache_history %}
+              <tr class="{{ 'admin-row-error' if h.error else '' }}">
+                <td>{{ h.ts }}</td>
+                <td>{{ h.deals_count }}</td>
+                <td>{{ h.duration_ms }}ms</td>
+                <td>{{ h.sources.get('ITAD', '—') }}</td>
+                <td>{{ h.sources.get('SteamSpy', '—') }}</td>
+                <td>{{ h.sources.get('GG.deals', '—') }}</td>
+                <td style="color:#ef4444;font-size:.75rem;max-width:200px;word-break:break-word">
+                  {{ h.error[:80] if h.error else '—' }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty">Sin historial aún. Se generará en la próxima actualización del caché.</p>
+        {% endif %}
+      </section>
+
+      <!-- Admin activity log -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">📋 Actividad del administrador</h2>
+        {% if admin_log %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Timestamp</th><th>Acción</th><th>Detalle</th></tr></thead>
+            <tbody>
+              {% for l in admin_log %}
+              <tr>
+                <td style="white-space:nowrap;font-size:.78rem">{{ l.ts }}</td>
+                <td><code style="background:rgba(240,192,64,.1);color:#f0c040;padding:1px 7px;border-radius:5px;font-size:.78rem">{{ l.action }}</code></td>
+                <td style="font-size:.82rem;color:#8892a0">{{ l.detail }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty">Sin actividad registrada aún.</p>
+        {% endif %}
+      </section>
+
+      <!-- Error log -->
+      <section class="admin-section">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+          <h2 class="admin-section-title" style="margin-bottom:0">💥 Log de errores del servidor</h2>
+          {% if error_log %}
+          <form method="POST" action="/admin/errors/clear">
+            <button class="admin-btn admin-btn--danger" type="submit">Limpiar log</button>
+          </form>
+          {% endif %}
+        </div>
+        {% if error_log %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Timestamp</th><th>Endpoint</th><th>Tipo</th><th>Mensaje</th></tr></thead>
+            <tbody>
+              {% for e in error_log %}
+              <tr>
+                <td style="white-space:nowrap;font-size:.78rem">{{ e.ts }}</td>
+                <td style="font-size:.82rem">{{ e.endpoint }}</td>
+                <td><code style="background:rgba(239,68,68,.12);color:#ef4444;padding:1px 7px;border-radius:5px;font-size:.75rem">{{ e.err_type }}</code></td>
+                <td style="font-size:.8rem;color:#8892a0;max-width:300px;word-break:break-word">{{ e.message[:120] }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty">Sin errores registrados. ✅</p>
+        {% endif %}
+      </section>
+
+    </div><!-- /tab-logs -->
+
+
+    <!-- ════════════════════════════════════════════════════
+         TAB 7: SEGURIDAD
+    ═════════════════════════════════════════════════════ -->
+    <div id="tab-security" class="admin-tab-panel">
+
+      <!-- Blocked IPs -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🚫 IPs bloqueadas</h2>
+        {% if blocked_ips %}
+        <div class="admin-table-wrap" style="margin-bottom:1rem">
+          <table class="admin-table">
+            <thead><tr><th>IP</th><th>Intentos fallidos</th><th>Último intento</th><th>Acción</th></tr></thead>
+            <tbody>
+              {% for b in blocked_ips %}
+              <tr>
+                <td><code style="background:rgba(239,68,68,.1);color:#ef4444;padding:2px 8px;border-radius:5px">{{ b.ip }}</code></td>
+                <td>{{ b.count }}</td>
+                <td>{{ b.last_ts }}</td>
+                <td>
+                  <form method="POST" action="/admin/security/unblock">
+                    <input type="hidden" name="ip" value="{{ b.ip }}"/>
+                    <button class="admin-btn admin-btn--ok" type="submit">Desbloquear</button>
+                  </form>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty">No hay IPs bloqueadas actualmente.</p>
+        {% endif %}
+      </section>
+
+      <!-- Login attempts -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🔐 Intentos de login recientes</h2>
+        {% if login_attempts %}
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead><tr><th>Timestamp</th><th>Target</th><th>IP</th><th>Resultado</th></tr></thead>
+            <tbody>
+              {% for a in login_attempts %}
+              <tr>
+                <td style="font-size:.78rem;white-space:nowrap">{{ a.ts }}</td>
+                <td style="font-size:.82rem">{{ a.target }}</td>
+                <td style="font-size:.82rem">{{ a.ip }}</td>
+                <td>
+                  {% if a.success %}
+                    <span class="admin-status admin-status--active">Exitoso</span>
+                  {% else %}
+                    <span class="admin-status admin-status--banned">Fallido</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+          <p class="admin-empty">Sin intentos de login registrados.</p>
+        {% endif %}
+      </section>
+
+      <!-- Security limits -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🛡 Límites de seguridad</h2>
+        <form method="POST" action="/admin/config">
+          <input type="hidden" name="_section" value="limits"/>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Intentos fallidos antes de bloquear</label>
+            <input type="number" name="max_attempts" class="admin-input" min="3" max="20"
+                   value="{{ config.get('max_attempts', '5') }}" style="width:90px"/>
+          </div>
+          <div class="admin-form-row">
+            <label class="admin-form-label">Duración del bloqueo (minutos)</label>
+            <input type="number" name="lockout_minutes" class="admin-input" min="5" max="1440"
+                   value="{{ config.get('lockout_minutes', '15') }}" style="width:90px"/>
+          </div>
+          <button type="submit" class="admin-btn admin-btn--primary">Guardar</button>
+        </form>
+      </section>
+
+      <!-- 2FA -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">🔑 Autenticación de dos factores (2FA)</h2>
+
+        {% if not totp_available %}
+        <div class="admin-info-box admin-info-box--warn">
+          <strong>pyotp no está instalado.</strong>
+          Ejecuta <code>pip install pyotp</code> y reinicia el servidor para activar 2FA.
+        </div>
+
+        {% elif config.get('totp_enabled') == '1' %}
+        <!-- 2FA active -->
+        <div class="admin-info-box admin-info-box--ok">
+          ✅ <strong>2FA activo.</strong> El login admin requiere un código TOTP adicional.
+        </div>
+        <form method="POST" action="/admin/2fa/disable" style="margin-top:1rem"
+              onsubmit="return confirm('¿Desactivar 2FA? El panel quedará protegido solo por contraseña.')">
+          <button class="admin-btn admin-btn--danger" type="submit">Desactivar 2FA</button>
+        </form>
+
+        {% elif config.get('totp_secret') %}
+        <!-- Secret generated, pending verification -->
+        <div class="admin-info-box">
+          <strong>Paso 1:</strong> Escanea el código QR en tu aplicación autenticadora (Google Authenticator, Authy, etc.)
+          o agrega la clave manualmente.
+        </div>
+        <div style="margin:1.2rem 0;background:rgba(255,255,255,.04);border-radius:10px;padding:1rem;font-family:monospace;word-break:break-all;font-size:.78rem;color:#c4cad6">
+          <div style="margin-bottom:.5rem;font-weight:700;color:#f0c040">Clave secreta:</div>
+          {{ config.get('totp_secret') }}
+        </div>
+        {% if totp_uri %}
+        <div style="margin-bottom:1rem;font-size:.8rem;color:#8892a0;word-break:break-all">
+          <strong>URI otpauth:</strong><br/>
+          <code style="font-size:.72rem">{{ totp_uri }}</code>
+        </div>
+        {% endif %}
+        <div class="admin-info-box" style="margin-bottom:1rem">
+          <strong>Paso 2:</strong> Ingresa un código de tu app para confirmar y activar 2FA.
+        </div>
+        <form method="POST" action="/admin/2fa/enable" style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+          <input type="text" name="code" class="admin-input" maxlength="6" pattern="[0-9]{6}"
+                 placeholder="000000" style="width:120px;text-align:center;letter-spacing:.4rem;font-size:1.1rem"/>
+          <button type="submit" class="admin-btn admin-btn--primary">✓ Verificar y activar</button>
+          <form method="POST" action="/admin/2fa/setup" style="display:inline">
+            <button type="submit" class="admin-btn admin-btn--outline">↺ Regenerar clave</button>
+          </form>
+        </form>
+
+        {% else %}
+        <!-- 2FA not set up -->
+        <div class="admin-info-box">
+          2FA no está configurado. Genera una clave secreta y agrégala a tu aplicación autenticadora.
+        </div>
+        <form method="POST" action="/admin/2fa/setup" style="margin-top:1rem">
+          <button type="submit" class="admin-btn admin-btn--primary">⚙ Configurar 2FA</button>
+        </form>
+        {% endif %}
+
+      </section>
+
+    </div><!-- /tab-security -->
+
+  </div><!-- /admin-container -->
+
+  <script>
+    // ── Save toast ────────────────────────────────────
+    (function () {
+      const params = new URLSearchParams(location.search);
+      if (params.has('saved')) {
+        const toast = document.createElement('div');
+        toast.textContent = '✓ Configuración guardada';
+        toast.style.cssText = [
+          'position:fixed', 'bottom:1.5rem', 'right:1.5rem', 'z-index:9999',
+          'background:#22c55e', 'color:#fff', 'font-weight:600',
+          'padding:.65rem 1.2rem', 'border-radius:10px',
+          'box-shadow:0 4px 20px rgba(0,0,0,.4)', 'font-size:.9rem',
+          'transition:opacity .4s',
+        ].join(';');
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+        setTimeout(() => toast.remove(), 3000);
+        // Clean the URL so a refresh doesn't re-show it
+        history.replaceState(null, '', location.pathname + '#' + (location.hash.replace('#', '') || 'tab-overview'));
+      }
+    })();
+
+    // ── Tab switching ─────────────────────────────────
+    const tabs   = document.querySelectorAll('.admin-tab');
+    const panels = document.querySelectorAll('.admin-tab-panel');
+
+    function activateTab(target) {
+      tabs.forEach(b => b.classList.toggle('admin-tab--active', b.dataset.target === target));
+      panels.forEach(p => p.classList.toggle('admin-tab-panel--active', p.id === target));
+    }
+
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        activateTab(btn.dataset.target);
+        history.replaceState(null, '', location.pathname + location.search + '#' + btn.dataset.target);
+      });
+    });
+
+    // Restore tab from URL hash
+    const hash = location.hash.replace('#', '');
+    if (hash && document.getElementById(hash)) activateTab(hash);
+  </script>
+
+</body>
+</html>

@@ -1,6 +1,9 @@
 # Secrets — NEVER commit these
 .env
 
+# User database — contains hashed passwords, keep local only
+users.db
+
 # Python
 __pycache__/
 *.py[cod]
@@ -28,3 +31,6 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Claude Code memory
+.claude/

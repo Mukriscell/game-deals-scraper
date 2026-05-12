@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mantenimiento – GAMEDEALS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0b0d12;
+      color: #c4cad6;
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .wrap { text-align: center; max-width: 500px; }
+    .logo {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.4rem;
+      letter-spacing: 4px;
+      color: #e0e3ea;
+      margin-bottom: 2rem;
+    }
+    .accent { color: #f0c040; }
+    .icon { font-size: 4rem; display: block; margin-bottom: 1.2rem; }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #e0e3ea;
+      margin-bottom: 0.8rem;
+    }
+    p {
+      font-size: 0.95rem;
+      color: #8892a0;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">🎮 GAME<span class="accent">DEALS</span></div>
+    <span class="icon">🔧</span>
+    <h1>Sitio en mantenimiento</h1>
+    <p>{{ msg }}</p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Verificar correo — GAMEDEALS{% endblock %}
+
+{% block main %}
+<div class="auth-container">
+  <div class="auth-card">
+
+    <div class="auth-logo">🎮 GAME<span class="accent">DEALS</span></div>
+    <h1 class="auth-title">Verifica tu correo</h1>
+
+    <p class="verify-hint">
+      Enviamos un código de 6 dígitos a<br>
+      <strong>{{ masked_email }}</strong>
+    </p>
+
+    {% if error %}
+    <div class="auth-error">{{ error }}</div>
+    {% endif %}
+
+    {% if success %}
+    <div class="auth-success">{{ success }}</div>
+    {% endif %}
+
+    <form method="POST" action="/verify-email" class="auth-form" autocomplete="off">
+      <div class="auth-field" style="align-items:center">
+        <label for="code">Código de verificación</label>
+        <input type="text" id="code" name="code"
+               class="code-input"
+               maxlength="6" pattern="[0-9]{6}" inputmode="numeric"
+               placeholder="000000" required autofocus
+               oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)">
+      </div>
+      <button type="submit" class="auth-submit">Verificar cuenta</button>
+    </form>
+
+    <div class="verify-footer">
+      <p>¿No llegó el correo o expiró el código?</p>
+      <form method="POST" action="/verify-email/resend" style="display:inline">
+        <button type="submit" class="verify-resend-btn">Reenviar código</button>
+      </form>
+    </div>
+
+    <div class="verify-timer" id="verify-timer"></div>
+
+    <p class="auth-footer">
+      <a href="/register" onclick="return confirmCancel()">← Volver al registro</a>
+    </p>
+
+  </div>
+</div>
+
+<script>
+  // Countdown: code is valid 30 min from page load (conservative display only)
+  (function () {
+    const el      = document.getElementById('verify-timer');
+    let seconds   = 30 * 60;
+
+    function tick() {
+      if (seconds <= 0) {
+        el.textContent = 'El código puede haber expirado. Reenvía uno nuevo si es necesario.';
+        el.style.color = '#ef4444';
+        return;
+      }
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      el.textContent = `El código expira en ${m}:${String(s).padStart(2, '0')}`;
+      seconds--;
+      setTimeout(tick, 1000);
+    }
+    tick();
+  })();
+
+  function confirmCancel() {
+    return confirm('¿Cancelar el registro? Perderás el código actual.');
+  }
+</script>
+{% endblock %}

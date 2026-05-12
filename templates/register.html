@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Crear cuenta — GAMEDEALS{% endblock %}
+
+{% block main %}
+<div class="auth-container">
+  <div class="auth-card">
+
+    <div class="auth-logo">🎮 GAME<span class="accent">DEALS</span></div>
+    <h1 class="auth-title">Crear cuenta</h1>
+
+    {% if error %}
+    <div class="auth-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" class="auth-form" novalidate>
+      <div class="auth-field">
+        <label for="email">Correo electrónico</label>
+        <input type="email" id="email" name="email" required
+               autocomplete="email" value="{{ email or '' }}"
+               placeholder="tu@correo.com">
+      </div>
+
+      <div class="auth-field">
+        <label for="password">Contraseña</label>
+        <div class="auth-input-wrap">
+          <input type="password" id="password" name="password" required
+                 autocomplete="new-password" placeholder="••••••••"
+                 oninput="checkReqs(this.value)">
+          <button type="button" class="auth-eye" aria-label="Mostrar contraseña"
+                  onclick="togglePw('password',this)">👁</button>
+        </div>
+        <ul class="pw-reqs" id="pw-reqs">
+          <li id="req-len"  class="req">Mínimo 8 caracteres</li>
+          <li id="req-low"  class="req">Una letra minúscula</li>
+          <li id="req-up"   class="req">Una letra mayúscula</li>
+          <li id="req-num"  class="req">Un número</li>
+          <li id="req-sym"  class="req">Un símbolo especial (!@#$%...)</li>
+        </ul>
+      </div>
+
+      <div class="auth-field">
+        <label for="password2">Confirmar contraseña</label>
+        <div class="auth-input-wrap">
+          <input type="password" id="password2" name="password2" required
+                 autocomplete="new-password" placeholder="••••••••"
+                 oninput="checkMatch()">
+          <button type="button" class="auth-eye" aria-label="Mostrar contraseña"
+                  onclick="togglePw('password2',this)">👁</button>
+        </div>
+        <span class="auth-match-msg" id="match-msg"></span>
+      </div>
+
+      <div class="auth-field auth-captcha-row">
+        <label>Verificación: <strong class="captcha-q">{{ captcha_q }}</strong></label>
+        <input type="number" name="captcha" required min="1" max="20"
+               placeholder="Respuesta" autocomplete="off">
+      </div>
+
+      <button type="submit" class="auth-submit">Crear cuenta</button>
+    </form>
+
+    <p class="auth-footer">¿Ya tienes cuenta? <a href="/login">Inicia sesión</a></p>
+  </div>
+</div>
+
+<script>
+const REQS = [
+  ['req-len', pw => pw.length >= 8],
+  ['req-low', pw => /[a-z]/.test(pw)],
+  ['req-up',  pw => /[A-Z]/.test(pw)],
+  ['req-num', pw => /\d/.test(pw)],
+  ['req-sym', pw => /[!@#$%^&*()\-_=+\[\]{}|;:'",.<>?/\\]/.test(pw)],
+];
+
+function checkReqs(pw) {
+  REQS.forEach(([id, fn]) => {
+    const el = document.getElementById(id);
+    el.classList.toggle('req--ok', fn(pw));
+    el.classList.toggle('req--fail', pw.length > 0 && !fn(pw));
+  });
+  checkMatch();
+}
+
+function checkMatch() {
+  const pw  = document.getElementById('password').value;
+  const pw2 = document.getElementById('password2').value;
+  const msg = document.getElementById('match-msg');
+  if (!pw2) { msg.textContent = ''; return; }
+  if (pw === pw2) { msg.textContent = '✓ Las contraseñas coinciden'; msg.className = 'auth-match-msg match--ok'; }
+  else            { msg.textContent = '✗ Las contraseñas no coinciden'; msg.className = 'auth-match-msg match--fail'; }
+}
+
+function togglePw(id, btn) {
+  const el = document.getElementById(id);
+  el.type = el.type === 'password' ? 'text' : 'password';
+  btn.textContent = el.type === 'password' ? '👁' : '🙈';
+}
+</script>
+{% endblock %}

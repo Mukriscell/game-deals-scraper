@@ -8,7 +8,7 @@
   <!-- Carrusel -->
   {% if featured %}
   <section class="carousel-section">
-    <h2 class="section-title">Juegos <span class="accent">Populares</span></h2>
+    <h2 class="section-title"><span data-i18n="sec_games_pfx">Juegos</span> <span class="accent" data-i18n="sec_pop">Populares</span></h2>
     <div class="carousel" id="carousel">
       <div class="carousel-track" id="carousel-track">
         {% for game in featured %}
@@ -20,7 +20,7 @@
             <div class="carousel-meta">
               {% if game.cut > 0 %}<span class="carousel-cut">-{{ game.cut }}%</span>{% endif %}
               {% if game.store %}<span class="carousel-store">{{ game.store }}</span>{% endif %}
-              {% if game.on_sale and game.cut >= 70 %}<span class="carousel-hot">🔥 OFERTA</span>{% endif %}
+              {% if game.on_sale and game.cut >= 70 %}<span class="carousel-hot" data-i18n="car_hot">🔥 OFERTA</span>{% endif %}
             </div>
             <h3 class="carousel-title">{{ game.title }}</h3>
             <div class="carousel-price-row">
@@ -32,7 +32,7 @@
                 {% endif %}
               {% endif %}
               <a href="{{ game.url }}" target="_blank" rel="noopener" class="carousel-btn">
-                {% if game.on_sale %}Ver oferta{% else %}Ver en ITAD{% endif %}
+                {% if game.on_sale %}<span data-i18n="car_deal">Ver oferta</span>{% else %}<span data-i18n="car_itad">Ver en ITAD</span>{% endif %}
               </a>
             </div>
           </div>
@@ -50,11 +50,41 @@
   </section>
   {% endif %}
 
+  <!-- RAWG Tendencia -->
+  {% if rawg_popular %}
+  <section class="rawg-section">
+    <h2 class="section-title">🔥 Juegos <span class="accent">Tendencia</span></h2>
+    <div class="rawg-grid">
+      {% for g in rawg_popular %}
+      <a href="{{ g.url }}" target="_blank" rel="noopener" class="rawg-card">
+        <div class="rawg-thumb" style="background-image:url('{{ g.image }}')">
+          {% if g.metacritic %}
+          <span class="rawg-mc rawg-mc--{% if g.metacritic >= 75 %}good{% elif g.metacritic >= 50 %}mixed{% else %}bad{% endif %}">{{ g.metacritic }}</span>
+          {% endif %}
+        </div>
+        <div class="rawg-info">
+          <div class="rawg-name">{{ g.name }}</div>
+          <div class="rawg-meta">
+            {% if g.rating > 0 %}<span class="rawg-rating">★ {{ g.rating }}</span>{% endif %}
+            {% if g.released %}<span class="rawg-year">{{ g.released }}</span>{% endif %}
+          </div>
+          {% if g.genres %}
+          <div class="rawg-genres">
+            {% for genre in g.genres %}<span class="rawg-tag">{{ genre }}</span>{% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
   <!-- Ofertas por tiempo limitado -->
   <section class="daily-deals-section" id="daily-deals-section" style="display:none">
     <h2 class="section-title">
-      ⏰ Ofertas <span class="accent">por Tiempo Limitado</span>
-      <span class="daily-deals-badge">Vencen en &lt;7 días</span>
+      <span data-i18n="sec_ltd_pfx">⏰ Ofertas</span> <span class="accent" data-i18n="sec_ltd">por Tiempo Limitado</span>
+      <span class="daily-deals-badge" data-i18n="badge_expires">Vencen en &lt;7 días</span>
     </h2>
     <div class="daily-deals-grid" id="daily-deals-grid"></div>
   </section>
@@ -63,12 +93,12 @@
   <div class="category-bar">
     <div class="category-label">
       <span>🎮</span>
-      <span>Juegos</span>
+      <span data-i18n="cat_games">Juegos</span>
     </div>
     <div class="stats-bar">
       <div class="stat">
         <span class="stat-num" id="stat-visible">{{ stats.games }}</span>
-        <span class="stat-label">Mostrados</span>
+        <span class="stat-label" data-i18n="stat_shown">Mostrados</span>
       </div>
       <div class="stat">
         <span class="stat-num">{{ stats.hot }}</span>
@@ -86,34 +116,36 @@
     <div class="search-wrapper">
       <span class="search-icon">🔍</span>
       <input type="text" id="search-input" class="search-input"
-             placeholder="Buscar juego..." autocomplete="off"/>
+             placeholder="Buscar juego..." autocomplete="off"
+             data-i18n-ph="ph_search"/>
       <button class="search-clear" id="search-clear" aria-label="Limpiar">✕</button>
       <div class="suggestions" id="suggestions"></div>
     </div>
     <div class="filter-group">
-      <label for="store-filter">Tienda</label>
+      <label for="store-filter" data-i18n="label_store">Tienda</label>
       <select id="store-filter">
-        <option value="All">Todas</option>
+        <option value="All" data-i18n="opt_all">Todas</option>
         {% for s in stores %}
         <option value="{{ s.id }}">{{ s.name }}</option>
         {% endfor %}
       </select>
     </div>
     <div class="filter-group">
-      <label for="price-filter">Precio máx. (USD)</label>
-      <input type="number" id="price-filter" min="0" step="0.01" placeholder="Cualquiera"/>
+      <label for="price-filter" data-i18n="label_price">Precio máx. (USD)</label>
+      <input type="number" id="price-filter" min="0" step="0.01"
+             placeholder="Cualquiera" data-i18n-ph="ph_price"/>
     </div>
     <div class="filter-group">
-      <label for="sort-filter">Ordenar por</label>
+      <label for="sort-filter" data-i18n="label_sort">Ordenar por</label>
       <select id="sort-filter">
-        <option value="discount">Mayor descuento</option>
-        <option value="price_asc">Precio: menor a mayor</option>
-        <option value="price_desc">Precio: mayor a menor</option>
-        <option value="alpha">Alfabético A–Z</option>
-        <option value="alpha_desc">Alfabético Z–A</option>
+        <option value="discount"   data-i18n="sort_disc" >Mayor descuento</option>
+        <option value="price_asc"  data-i18n="sort_pasc" >Precio: menor a mayor</option>
+        <option value="price_desc" data-i18n="sort_pdesc">Precio: mayor a menor</option>
+        <option value="alpha"      data-i18n="sort_az"   >Alfabético A–Z</option>
+        <option value="alpha_desc" data-i18n="sort_za"   >Alfabético Z–A</option>
       </select>
     </div>
-    <button class="btn-reset" id="btn-reset">↺ Reset</button>
+    <button class="btn-reset" id="btn-reset" data-i18n="btn_reset">↺ Reset</button>
   </div>
 
   <!-- Grid de juegos -->
@@ -122,8 +154,8 @@
   <!-- Estado vacío -->
   <div class="empty-state" id="empty-state" style="display:none">
     <div class="empty-icon">🕹️</div>
-    <p>No se encontraron juegos con esos filtros.</p>
-    <button class="btn-reset" id="btn-reset2">Limpiar filtros</button>
+    <p data-i18n="empty_msg">No se encontraron juegos con esos filtros.</p>
+    <button class="btn-reset" id="btn-reset2" data-i18n="empty_btn">Limpiar filtros</button>
   </div>
 
 {% endblock %}

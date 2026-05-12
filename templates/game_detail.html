@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}{{ game.name }} — GAMEDEALS{% endblock %}
+
+{% block main %}
+
+<div class="gd-hero" style="background-image: url('{{ game.background }}')">
+  <div class="gd-hero-overlay"></div>
+  <div class="gd-hero-content">
+    <a href="/games" class="gd-back">← Volver a ofertas</a>
+    <h1 class="gd-title">{{ game.name }}</h1>
+
+    <div class="gd-hero-badges">
+      {% if game.metacritic %}
+      <span class="gd-mc gd-mc--{% if game.metacritic >= 75 %}good{% elif game.metacritic >= 50 %}mixed{% else %}bad{% endif %}">
+        {{ game.metacritic }}<small>Metacritic</small>
+      </span>
+      {% endif %}
+      {% if game.rating > 0 %}
+      <span class="gd-badge">★ {{ game.rating }} / 5
+        {% if game.ratings_count %}<small>({{ game.ratings_count }} votos)</small>{% endif %}
+      </span>
+      {% endif %}
+      {% if game.released %}
+      <span class="gd-badge">📅 {{ game.released }}</span>
+      {% endif %}
+      {% if game.esrb %}
+      <span class="gd-badge">{{ game.esrb }}</span>
+      {% endif %}
+    </div>
+
+    {% if deal %}
+    <div class="gd-deal-bar">
+      <div class="gd-deal-price">
+        {% if deal.price == 0 %}
+          <span class="gd-free-tag">GRATIS</span>
+        {% else %}
+          <span class="gd-orig">{{ deal.currency }} {{ "%.2f"|format(deal.original_price) }}</span>
+          <span class="gd-now">{{ deal.currency }} {{ "%.2f"|format(deal.price) }}</span>
+          <span class="gd-disc">-{{ deal.discount }}%</span>
+        {% endif %}
+        <span class="gd-store-name">en {{ deal.store }}</span>
+      </div>
+      <a href="{{ deal.url }}" target="_blank" rel="noopener" class="gd-cta">Ver oferta →</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="gd-body">
+
+  <!-- Ratings breakdown -->
+  {% if game.ratings %}
+  <section class="gd-section">
+    <h2 class="gd-section-title">Calificaciones de jugadores</h2>
+    <div class="gd-ratings-grid">
+      {% for r in game.ratings %}
+      <div class="gd-rbar">
+        <span class="gd-rbar-label">{{ r.title | capitalize }}</span>
+        <div class="gd-rbar-track">
+          <div class="gd-rbar-fill gd-rbar--{{ r.title }}" style="width:{{ r.percent }}%"></div>
+        </div>
+        <span class="gd-rbar-pct">{{ "%.0f"|format(r.percent) }}%</span>
+        <span class="gd-rbar-count">({{ r.count }})</span>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Info grid -->
+  <section class="gd-section">
+    <h2 class="gd-section-title">Información</h2>
+    <div class="gd-info-grid">
+      {% if game.developers %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Desarrollador</span>
+        <span class="gd-info-val">{{ game.developers | join(', ') }}</span>
+      </div>
+      {% endif %}
+      {% if game.publishers %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Publisher</span>
+        <span class="gd-info-val">{{ game.publishers | join(', ') }}</span>
+      </div>
+      {% endif %}
+      {% if game.released %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Lanzamiento</span>
+        <span class="gd-info-val">{{ game.released }}</span>
+      </div>
+      {% endif %}
+      {% if game.genres %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Géneros</span>
+        <span class="gd-info-val">{{ game.genres | join(', ') }}</span>
+      </div>
+      {% endif %}
+      {% if game.platforms %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Plataformas</span>
+        <span class="gd-info-val">{{ game.platforms | join(', ') }}</span>
+      </div>
+      {% endif %}
+      {% if game.esrb %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Clasificación</span>
+        <span class="gd-info-val">{{ game.esrb }}</span>
+      </div>
+      {% endif %}
+      {% if game.website %}
+      <div class="gd-info-item">
+        <span class="gd-info-label">Web oficial</span>
+        <a href="{{ game.website }}" target="_blank" rel="noopener" class="gd-info-link">{{ game.website }}</a>
+      </div>
+      {% endif %}
+      {% if game.metacritic_platforms %}
+      <div class="gd-info-item gd-info-item--wide">
+        <span class="gd-info-label">Metacritic por plataforma</span>
+        <span class="gd-info-val">
+          {% for mp in game.metacritic_platforms %}
+          <span class="gd-mc-plat gd-mc--{% if mp.metascore >= 75 %}good{% elif mp.metascore >= 50 %}mixed{% else %}bad{% endif %}">
+            {{ (mp.platform or {}).get('name', '') }} {{ mp.metascore }}
+          </span>
+          {% endfor %}
+        </span>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Description -->
+  {% if game.description %}
+  <section class="gd-section">
+    <h2 class="gd-section-title">Descripción</h2>
+    <div class="gd-description" id="gd-desc">
+      {{ game.description[:800] }}{% if game.description|length > 800 %}<span id="gd-desc-rest" style="display:none">{{ game.description[800:] }}</span>
+      <button class="gd-read-more" onclick="document.getElementById('gd-desc-rest').style.display='inline';this.style.display='none'">Leer más ↓</button>{% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Screenshots -->
+  {% if game.screenshots %}
+  <section class="gd-section">
+    <h2 class="gd-section-title">Capturas de pantalla</h2>
+    <div class="gd-screenshots">
+      {% for ss in game.screenshots %}
+      <a href="{{ ss }}" target="_blank" rel="noopener" class="gd-ss-wrap">
+        <img src="{{ ss }}" alt="Screenshot" loading="lazy" class="gd-ss-img">
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- System requirements -->
+  {% if game.pc_min or game.pc_rec %}
+  <section class="gd-section">
+    <h2 class="gd-section-title">Requisitos de sistema (PC)</h2>
+    <div class="gd-reqs">
+      {% if game.pc_min %}
+      <div class="gd-req-block">
+        <h3 class="gd-req-title">Mínimos</h3>
+        <div class="gd-req-text">{{ game.pc_min | safe }}</div>
+      </div>
+      {% endif %}
+      {% if game.pc_rec %}
+      <div class="gd-req-block">
+        <h3 class="gd-req-title">Recomendados</h3>
+        <div class="gd-req-text">{{ game.pc_rec | safe }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- Tags -->
+  {% if game.tags %}
+  <section class="gd-section">
+    <h2 class="gd-section-title">Etiquetas</h2>
+    <div class="gd-tags">
+      {% for tag in game.tags %}<span class="gd-tag">{{ tag }}</span>{% endfor %}
+    </div>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}

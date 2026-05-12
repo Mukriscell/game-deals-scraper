@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin Login – GAMEDEALS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/style.css"/>
+</head>
+<body>
+  <div class="admin-login-page">
+    <div class="admin-login-card">
+
+      <div class="admin-login-logo">🎮 GAME<span class="accent">DEALS</span></div>
+      <div class="admin-login-subtitle">Panel de Administración</div>
+
+      {% if error %}
+      <div class="auth-error" style="margin-bottom:1.1rem">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" class="auth-form">
+        <div class="auth-field">
+          <label for="email">Correo de administrador</label>
+          <input type="email" id="email" name="email" required autocomplete="off"
+                 value="{{ request.form.get('email', '') }}"/>
+        </div>
+        <div class="auth-field">
+          <label for="password">Contraseña</label>
+          <div class="auth-input-wrap">
+            <input type="password" id="password" name="password" required autocomplete="off"/>
+            <button type="button" class="auth-eye" onclick="togglePw('password',this)" aria-label="Ver contraseña">👁</button>
+          </div>
+        </div>
+        <button type="submit" class="auth-submit">Acceder al panel</button>
+      </form>
+
+      <p style="text-align:center;margin-top:1.1rem;font-size:0.78rem;color:#5a6270;">
+        <a href="/games" style="color:#5a6270;text-decoration:none;">← Volver al sitio</a>
+      </p>
+
+    </div>
+  </div>
+
+  <script>
+    function togglePw(id, btn) {
+      const inp = document.getElementById(id);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+      btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+    }
+  </script>
+</body>
+</html>

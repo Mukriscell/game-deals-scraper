@@ -13,6 +13,8 @@ ITAD_KEY     = os.environ.get("ITAD_API_KEY", "")
 STEAMSPY_API = "https://steamspy.com/api.php"
 GGDEALS_API  = "https://api.gg.deals/v1/prices/by-steam-app-id/"
 GGDEALS_KEY  = os.environ.get("GGDEALS_API_KEY", "")
+RAWG_API     = "https://api.rawg.io/api"
+RAWG_KEY     = os.environ.get("RAWG_API_KEY", "")
 
 HEADERS = {
     "User-Agent": (
@@ -595,6 +597,137 @@ def scrape_ggdeals_deals() -> list:
     deals.sort(key=lambda d: d["discount"], reverse=True)
     print(f"[ggdeals] {len(deals)} discounted games from top100forever")
     return deals
+
+
+def _search_rawg_id(name: str) -> int | None:
+    if not RAWG_KEY:
+        return None
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games",
+            params={"key": RAWG_KEY, "search": name, "page_size": 5},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results") or []
+        return results[0]["id"] if results else None
+    except Exception as e:
+        print(f"[rawg_search] Error: {e}")
+        return None
+
+
+def fetch_rawg_game_detail(name: str) -> dict | None:
+    """Search RAWG by name and return full game detail dict, or None."""
+    game_id = _search_rawg_id(name)
+    if not game_id:
+        return None
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games/{game_id}",
+            params={"key": RAWG_KEY},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"[rawg_detail] Error: {e}")
+        return None
+
+    try:
+        ss_resp = SESSION.get(
+            f"{RAWG_API}/games/{game_id}/screenshots",
+            params={"key": RAWG_KEY, "page_size": 8},
+            timeout=10,
+        )
+        ss_resp.raise_for_status()
+        screenshots = [s["image"] for s in (ss_resp.json().get("results") or [])]
+    except Exception:
+        screenshots = []
+
+    pc_min = pc_rec = ""
+    for p in data.get("platforms") or []:
+        if (p.get("platform") or {}).get("slug") == "pc":
+            req = p.get("requirements") or {}
+            pc_min = req.get("minimum") or ""
+            pc_rec = req.get("recommended") or ""
+            break
+
+    platforms = [
+        (p.get("platform") or {}).get("name")
+        for p in (data.get("platforms") or [])
+        if (p.get("platform") or {}).get("name")
+    ]
+
+    return {
+        "id":           data.get("id"),
+        "name":         data.get("name") or "",
+        "description":  data.get("description_raw") or "",
+        "released":     data.get("released") or "",
+        "background":   data.get("background_image") or "",
+        "background2":  data.get("background_image_additional") or "",
+        "website":      data.get("website") or "",
+        "rating":       round(float(data.get("rating") or 0), 1),
+        "ratings_count": data.get("ratings_count") or 0,
+        "ratings":      data.get("ratings") or [],
+        "metacritic":   data.get("metacritic"),
+        "metacritic_platforms": data.get("metacritic_platforms") or [],
+        "platforms":    platforms,
+        "genres":       [g["name"] for g in (data.get("genres") or [])],
+        "tags":         [t["name"] for t in (data.get("tags") or [])[:12]],
+        "developers":   [d["name"] for d in (data.get("developers") or [])],
+        "publishers":   [p["name"] for p in (data.get("publishers") or [])],
+        "esrb":         (data.get("esrb_rating") or {}).get("name") or "",
+        "pc_min":       pc_min,
+        "pc_rec":       pc_rec,
+        "screenshots":  screenshots,
+        "slug":         data.get("slug") or "",
+    }
+
+
+def scrape_rawg_popular(count: int = 20) -> list:
+    """Fetches trending recent games from RAWG (ordered by player additions)."""
+    if not RAWG_KEY:
+        return []
+    from datetime import date, timedelta
+    end   = date.today().isoformat()
+    start = (date.today() - timedelta(days=365)).isoformat()
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games",
+            params={
+                "key":       RAWG_KEY,
+                "ordering":  "-added",
+                "dates":     f"{start},{end}",
+                "page_size": count,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        print(f"[rawg] Error: {e}")
+        return []
+
+    result = []
+    for g in data.get("results") or []:
+        steam_url = ""
+        for s in g.get("stores") or []:
+            if (s.get("store") or {}).get("slug") == "steam":
+                steam_url = s.get("url") or ""
+                break
+        genres = [genre["name"] for genre in (g.get("genres") or [])][:3]
+        result.append({
+            "id":         g.get("id"),
+            "name":       g.get("name") or "Unknown",
+            "image":      g.get("background_image") or "",
+            "rating":     round(float(g.get("rating") or 0), 1),
+            "metacritic": g.get("metacritic"),
+            "released":   (g.get("released") or "")[:4],
+            "genres":     genres,
+            "url":        steam_url or f"https://rawg.io/games/{g.get('slug', g.get('id'))}",
+        })
+    print(f"[rawg] {len(result)} trending games")
+    return result
 
 
 def scrape_subscriptions(game_ids: list) -> dict:

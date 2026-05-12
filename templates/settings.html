@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Ajustes — GAMEDEALS{% endblock %}
+
+{% block main %}
+<div class="auth-container">
+  <div class="auth-card" style="max-width:500px">
+
+    <div class="auth-logo">⚙️ <span data-i18n="settings_title">Ajustes</span></div>
+
+    <section class="settings-section">
+      <h2 class="settings-section-title" data-i18n="settings_acct">Cuenta</h2>
+      <div class="settings-row">
+        <span class="settings-label" data-i18n="settings_email">Correo electrónico</span>
+        <span class="settings-value">{{ current_user }}</span>
+      </div>
+    </section>
+
+    <div class="settings-soon" data-i18n="settings_soon">Más opciones próximamente.</div>
+
+    <a href="/games" class="auth-submit" style="text-align:center;text-decoration:none;display:block">
+      ← Volver
+    </a>
+  </div>
+</div>
+{% endblock %}

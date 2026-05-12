@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Mis Deseados – GAMEDEALS{% endblock %}
+{% block tagline %}Tu lista de juegos guardados{% endblock %}
+
+{% block main %}
+
+  <div class="category-bar">
+    <div class="category-label">
+      <span>❤️</span>
+      <span>Mis Deseados</span>
+    </div>
+    <div class="stats-bar">
+      <div class="stat">
+        <span class="stat-num" id="wl-count">{{ items | length }}</span>
+        <span class="stat-label">Guardados</span>
+      </div>
+    </div>
+  </div>
+
+  {% if items %}
+  <p class="wl-note">Los precios mostrados son los del momento en que guardaste cada oferta.</p>
+  <div class="deals-grid" id="wl-grid">
+    {% for item in items %}
+    <div class="wl-item" data-name="{{ item.deal_name | e }}">
+      <a href="{{ item.deal_url }}" target="_blank" rel="noopener"
+         class="card {{ 'card--free' if item.deal_price == 0 }} {{ 'card--hot' if item.deal_disc >= 70 }}">
+        {% if item.deal_thumb %}
+        <div class="card-thumb">
+          <img src="{{ item.deal_thumb }}" alt="{{ item.deal_name | e }}" loading="lazy"/>
+        </div>
+        {% else %}
+        <div class="card-thumb card-thumb--empty"><span>🎮</span></div>
+        {% endif %}
+
+        {% if item.deal_price == 0 %}
+          <div class="badge badge--free">🎁 GRATIS</div>
+        {% elif item.deal_disc >= 70 %}
+          <div class="badge badge--hot">🔥 OFERTA</div>
+        {% else %}
+          <div class="badge badge--sale">-{{ item.deal_disc }}%</div>
+        {% endif %}
+
+        <div class="card-body">
+          <div class="card-store-row">
+            <span class="card-store">{{ item.deal_store }}</span>
+          </div>
+          <div class="card-name">{{ item.deal_name }}</div>
+        </div>
+        <div class="card-pricing">
+          <span class="price-original">{{ item.deal_currency }} {{ "%.2f" | format(item.deal_orig) }}</span>
+          {% if item.deal_price == 0 %}
+            <span class="price-current price-free">GRATIS</span>
+          {% else %}
+            <span class="price-current">{{ item.deal_currency }} {{ "%.2f" | format(item.deal_price) }}</span>
+          {% endif %}
+          <span class="discount-tag">-{{ item.deal_disc }}%</span>
+        </div>
+      </a>
+      <button class="wl-remove-btn" data-name="{{ item.deal_name | e }}" title="Quitar de deseados">✕</button>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state" id="wl-empty" style="display:flex">
+    <div class="empty-icon">❤️</div>
+    <p>Aún no tienes juegos guardados. Usa el menú <strong>⋮</strong> en cualquier oferta para agregarla aquí.</p>
+    <a href="/games" class="btn-reset" style="text-decoration:none;display:inline-block;padding:.6rem 1.4rem">
+      Ver ofertas
+    </a>
+  </div>
+  {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function () {
+    const grid  = document.getElementById('wl-grid');
+    const count = document.getElementById('wl-count');
+    const empty = document.getElementById('wl-empty');
+
+    function updateCount() {
+      if (!count) return;
+      const n = document.querySelectorAll('.wl-item').length;
+      count.textContent = n;
+      if (n === 0 && grid) {
+        grid.style.display = 'none';
+        if (empty) empty.style.display = 'flex';
+        // Update sidebar badge
+        const sb = document.getElementById('wl-sidebar-count');
+        if (sb) { sb.textContent = '0'; sb.style.display = 'none'; }
+      }
+    }
+
+    document.querySelectorAll('.wl-remove-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const name = btn.dataset.name;
+        const item = btn.closest('.wl-item');
+        fetch('/api/wishlist/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name }),
+        })
+          .then(function () {
+            if (item) item.remove();
+            updateCount();
+            // Keep client-side WISHLIST_NAMES in sync
+            if (window.WISHLIST_NAMES) window.WISHLIST_NAMES.delete(name);
+            const sb = document.getElementById('wl-sidebar-count');
+            if (sb && window.WISHLIST_NAMES) {
+              const n = window.WISHLIST_NAMES.size;
+              sb.textContent = n;
+              sb.style.display = n > 0 ? '' : 'none';
+            }
+          })
+          .catch(function () {});
+      });
+    });
+  })();
+</script>
+{% endblock %}
