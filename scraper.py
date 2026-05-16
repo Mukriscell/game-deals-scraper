@@ -16,6 +16,15 @@ GGDEALS_KEY  = os.environ.get("GGDEALS_API_KEY", "")
 RAWG_API     = "https://api.rawg.io/api"
 RAWG_KEY     = os.environ.get("RAWG_API_KEY", "")
 
+# Demo mode: si no hay keys, servimos datos de muestra para que la UI
+# sea navegable sin registrarse en ningún servicio.
+DEMO_MODE = not ITAD_KEY
+if DEMO_MODE:
+    print("[scraper] DEMO MODE activo (sin ITAD_API_KEY). Usando catálogo de muestra.")
+    import demo_data as _demo
+else:
+    _demo = None
+
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -328,6 +337,8 @@ def _parse_deal(item: dict) -> dict:
 
 
 def scrape_deals(pages: int = 5) -> list:
+    if DEMO_MODE:
+        return _demo.demo_deals()
     if not ITAD_KEY:
         print("[scraper] ERROR: ITAD_API_KEY no configurada.")
         return []
@@ -367,6 +378,8 @@ def scrape_deals(pages: int = 5) -> list:
 
 
 def scrape_popular(count: int = 12) -> list:
+    if DEMO_MODE:
+        return _demo.demo_popular(count)
     if not ITAD_KEY:
         return []
 
@@ -432,6 +445,8 @@ def scrape_popular(count: int = 12) -> list:
 
 
 def scrape_steamspy_deals() -> list:
+    if DEMO_MODE:
+        return []
     """Fetch discounted Steam games from SteamSpy top100in2weeks (no API key required)."""
     try:
         resp = SESSION.get(
@@ -486,6 +501,8 @@ def scrape_steamspy_deals() -> list:
 
 
 def scrape_ggdeals_deals() -> list:
+    if DEMO_MODE:
+        return []
     """
     Fetches top-100-forever games from SteamSpy (original prices + App IDs),
     then queries GG.deals for current retail prices across all stores.
@@ -618,6 +635,8 @@ def _search_rawg_id(name: str) -> int | None:
 
 def fetch_rawg_game_detail(name: str) -> dict | None:
     """Search RAWG by name and return full game detail dict, or None."""
+    if DEMO_MODE or not RAWG_KEY:
+        return _demo.demo_rawg_detail(name) if _demo else None
     game_id = _search_rawg_id(name)
     if not game_id:
         return None
@@ -686,8 +705,8 @@ def fetch_rawg_game_detail(name: str) -> dict | None:
 
 def scrape_rawg_popular(count: int = 20) -> list:
     """Fetches trending recent games from RAWG (ordered by player additions)."""
-    if not RAWG_KEY:
-        return []
+    if DEMO_MODE or not RAWG_KEY:
+        return _demo.demo_rawg_trending(count) if _demo else []
     from datetime import date, timedelta
     end   = date.today().isoformat()
     start = (date.today() - timedelta(days=365)).isoformat()
@@ -732,6 +751,8 @@ def scrape_rawg_popular(count: int = 20) -> list:
 
 def scrape_subscriptions(game_ids: list) -> dict:
     """Returns {game_id: [sub_list]} for games currently in subscription services."""
+    if DEMO_MODE:
+        return {}
     if not ITAD_KEY or not game_ids:
         return {}
     try:

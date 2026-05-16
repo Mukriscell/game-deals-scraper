@@ -68,10 +68,15 @@ def inject_user():
 @app.context_processor
 def inject_banner():
     from admin_db import get_config
+    from scraper import DEMO_MODE
     active = get_config('banner_active') == '1'
+    text = get_config('banner_text') if active else ''
+    if DEMO_MODE:
+        active = True
+        text = "🧪 MODO DEMO · datos de muestra · agregá ITAD_API_KEY y RAWG_API_KEY en .env para usar la API real"
     return {
         'banner_active': active,
-        'banner_text':   get_config('banner_text') if active else '',
+        'banner_text':   text,
     }
 
 
