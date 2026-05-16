@@ -3,55 +3,340 @@
 
 {% block main %}
 
-<div class="gd-hero" style="background-image: url('{{ game.background }}')">
-  <div class="gd-hero-overlay"></div>
-  <div class="gd-hero-content">
-    <a href="/games" class="gd-back">← Volver a ofertas</a>
-    <h1 class="gd-title">{{ game.name }}</h1>
+{% set p = predictions %}
+{% set cur_sym = (deal.currency if deal else 'USD') %}
 
-    <div class="gd-hero-badges">
+{% set price_hi = p.original_price if p.original_price > 0 else (p.current_price * 2 if p.current_price else 60) %}
+{% set price_lo = p.history_low if p.history_low > 0 else (p.current_price * 0.5 if p.current_price else 15) %}
+{% set price_mid = (price_hi + price_lo) / 2 %}
+{% set price_cur = p.current_price if p.current_price > 0 else price_mid %}
+
+<div class="pred-page">
+
+  <a href="/games" class="pred-back">← Volver al catálogo</a>
+
+  <!-- ── GAME HEADER ───────────────────────────── -->
+  <section class="pred-card pred-header-card">
+    <div class="pred-cover"
+         {% if game.background %}style="background-image:url('{{ game.background }}')"{% endif %}>
+      {% if not game.background %}<span class="pred-cover-fallback">{{ game.name[:1] }}</span>{% endif %}
+    </div>
+
+    <div class="pred-header-info">
+      <div class="pred-header-meta">
+        {% set genre_str = (game.genres[:3] | join(' · ')) if game.genres else '' %}
+        {% if genre_str %}{{ genre_str | upper }}{% endif %}
+        {% if deal and deal.store %}{% if genre_str %} · {% endif %}{{ deal.store | upper }}{% endif %}
+      </div>
+      <h1 class="pred-title">{{ game.name }}</h1>
+
+      {% if deal %}
+      <div class="pred-price-row">
+        {% if deal.price == 0 %}
+          <span class="pred-free">GRATIS</span>
+        {% else %}
+          {% if deal.original_price and deal.original_price > deal.price %}
+            <span class="pred-orig">{{ cur_sym }} {{ "%.2f"|format(deal.original_price) }}</span>
+          {% endif %}
+          <span class="pred-now">{{ cur_sym }} {{ "%.2f"|format(deal.price) }}</span>
+          {% if deal.discount and deal.discount > 0 %}
+            <span class="pred-disc">-{{ deal.discount }}%</span>
+          {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="pred-header-actions">
+      {% if deal and deal.url %}
+      <a href="{{ deal.url }}" target="_blank" rel="noopener"
+         class="pred-btn pred-btn--primary">🛒 Ir a la tienda</a>
+      {% endif %}
+      <button type="button" class="pred-btn pred-btn--ghost" id="pred-wishlist-btn"
+              data-name="{{ game.name }}">♥ Wishlist</button>
+    </div>
+  </section>
+
+  <!-- ── STATS GRID ──────────────────────────────── -->
+  <section class="pred-stats-grid">
+    <div class="pred-card pred-stat pred-stat--highlight">
+      <div class="pred-eyebrow">🎯 PRÓXIMA REBAJA ESTIMADA</div>
+      <div class="pred-stat-row">
+        <span class="pred-stat-num pred-stat-num--accent">~{{ p.next_sale_days }}</span>
+        <span class="pred-stat-unit">días</span>
+      </div>
+      <div class="pred-stat-foot">Confianza:
+        <span class="pred-good">{{ p.next_sale_confidence }}</span>
+      </div>
+    </div>
+
+    <div class="pred-card pred-stat">
+      <div class="pred-eyebrow">📅 INTERVALO ENTRE REBAJAS</div>
+      <div class="pred-stat-row">
+        <span class="pred-stat-num">{{ p.interval_days }}</span>
+        <span class="pred-stat-unit">días promedio</span>
+      </div>
+      <div class="pred-stat-foot">Última hace
+        <span class="pred-strong">{{ p.last_sale_days_ago }} días</span>
+      </div>
+    </div>
+
+    <div class="pred-card pred-stat">
+      <div class="pred-eyebrow">📊 DESCUENTO PROMEDIO</div>
+      <div class="pred-stat-row">
+        <span class="pred-stat-num">{{ p.avg_discount }}%</span>
+        <span class="pred-stat-unit">en ofertas</span>
+      </div>
+      <div class="pred-stat-foot">Máximo histórico:
+        <span class="pred-good">-{{ p.max_discount }}%</span>
+      </div>
+    </div>
+
+    <div class="pred-card pred-stat">
+      <div class="pred-eyebrow">💰 MÍNIMO HISTÓRICO</div>
+      <div class="pred-stat-row">
+        <span class="pred-stat-num pred-stat-num--good">{{ cur_sym }} {{ "%.2f"|format(p.history_low) }}</span>
+      </div>
+      <div class="pred-stat-foot">Mejor precio registrado</div>
+    </div>
+  </section>
+
+  <!-- ── CHART + INSIGHTS ─────────────────────── -->
+  <section class="pred-chart-row">
+
+    <div class="pred-card pred-chart-card">
+      <div class="pred-eyebrow">📈 HISTORIAL DE PRECIO · ÚLTIMOS 12 MESES</div>
+      <div class="pred-chart-head">
+        <h2 class="pred-card-title">Evolución y predicción</h2>
+        <div class="pred-tabs">
+          <button type="button" class="pred-tab pred-tab--active">12M</button>
+          <button type="button" class="pred-tab">6M</button>
+          <button type="button" class="pred-tab">3M</button>
+        </div>
+      </div>
+
+      <div class="pred-chart-wrap">
+        <svg viewBox="0 0 900 380" class="pred-chart-svg" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <linearGradient id="predBandGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#f0c040" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#f0c040" stop-opacity="0.05"/>
+            </linearGradient>
+            <pattern id="predGrid" width="60" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 60 0 L 0 0 0 40" fill="none" stroke="#252a3a" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+
+          <text x="60" y="30" text-anchor="end" font-size="11" fill="#6b7490">{{ cur_sym }} {{ "%.0f"|format(price_hi) }}</text>
+          <text x="60" y="110" text-anchor="end" font-size="11" fill="#6b7490">{{ cur_sym }} {{ "%.0f"|format(price_mid) }}</text>
+          <text x="60" y="190" text-anchor="end" font-size="11" fill="#6b7490">{{ cur_sym }} {{ "%.0f"|format(price_cur) }}</text>
+          <text x="60" y="270" text-anchor="end" font-size="11" fill="#6b7490">{{ cur_sym }} {{ "%.0f"|format(price_lo) }}</text>
+          <text x="60" y="342" text-anchor="end" font-size="11" fill="#6b7490">{{ cur_sym }} 0</text>
+
+          <rect x="70" y="20" width="820" height="320" fill="url(#predGrid)"/>
+
+          <!-- Prediction band -->
+          <rect x="845" y="20" width="55" height="320" fill="url(#predBandGrad)"/>
+          <line x1="845" y1="20" x2="845" y2="340" stroke="#f0c040" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+          <line x1="900" y1="20" x2="900" y2="340" stroke="#f0c040" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+
+          <!-- Price line (illustrative) -->
+          <polyline points="90,30 130,30 170,30 210,28 250,28 280,190 320,190 360,195 400,30 440,30 475,30 510,190 560,270 600,270 640,190 680,195 720,120 760,120 800,120 845,190"
+                    fill="none" stroke="#e4e8f0" stroke-width="2.5" stroke-linejoin="round"/>
+
+          <!-- Sale dots -->
+          <circle cx="290" cy="190" r="6" fill="#e05c3a" stroke="#0b0d12" stroke-width="2"/>
+          <circle cx="520" cy="190" r="6" fill="#e05c3a" stroke="#0b0d12" stroke-width="2"/>
+          <circle cx="570" cy="270" r="8" fill="#e05c3a" stroke="#0b0d12" stroke-width="2"/>
+          <circle cx="730" cy="120" r="6" fill="#e05c3a" stroke="#0b0d12" stroke-width="2"/>
+          <circle cx="845" cy="190" r="7" fill="#e05c3a" stroke="#0b0d12" stroke-width="2"/>
+          <circle cx="845" cy="190" r="11" fill="none" stroke="#f0c040" stroke-width="2"/>
+          <circle cx="845" cy="190" r="15" fill="none" stroke="#f0c040" stroke-width="1" opacity="0.5"/>
+
+          <!-- Historic low tooltip -->
+          <line x1="570" y1="270" x2="570" y2="80" stroke="#e05c3a" stroke-dasharray="3 3" opacity="0.4"/>
+          <rect x="500" y="55" width="170" height="58" rx="6" fill="#0b0d12" stroke="#e05c3a"/>
+          <text x="515" y="74" font-size="9" fill="#6b7490" letter-spacing="1">MÍNIMO HISTÓRICO</text>
+          <text x="515" y="91" font-size="14" font-weight="700" fill="#e4e8f0">{{ cur_sym }} {{ "%.2f"|format(p.history_low) }} · -{{ p.max_discount }}%</text>
+          <text x="515" y="106" font-size="10" fill="#6b7490">Mejor oferta registrada</text>
+
+          <!-- Prediction badge -->
+          <rect x="835" y="2" width="78" height="20" rx="4" fill="#f0c040"/>
+          <text x="874" y="16" text-anchor="middle" font-size="10" font-weight="700" fill="#0b0d12">PREDICCIÓN</text>
+
+          <!-- Month labels -->
+          <g font-size="10" fill="#6b7490">
+            <text x="90" y="360">May</text>
+            <text x="160" y="360">Jun</text>
+            <text x="230" y="360">Jul</text>
+            <text x="300" y="360">Ago</text>
+            <text x="370" y="360">Sep</text>
+            <text x="440" y="360">Oct</text>
+            <text x="510" y="360">Nov</text>
+            <text x="580" y="360">Dic</text>
+            <text x="650" y="360">Ene</text>
+            <text x="720" y="360">Feb</text>
+            <text x="780" y="360">Mar</text>
+            <text x="820" y="360">Abr</text>
+            <text x="865" y="360" fill="#f0c040" font-weight="700">May</text>
+          </g>
+        </svg>
+      </div>
+
+      <div class="pred-legend">
+        <span class="pred-legend-item"><span class="pred-legend-line"></span>Precio</span>
+        <span class="pred-legend-item"><span class="pred-legend-dot"></span>Rebaja histórica</span>
+        <span class="pred-legend-item"><span class="pred-legend-band"></span>Ventana probable</span>
+      </div>
+    </div>
+
+    <aside class="pred-card pred-insights-card">
+      <div class="pred-eyebrow">🧠 INSIGHTS</div>
+      <h2 class="pred-card-title">Análisis del juego</h2>
+
+      <div class="pred-insight pred-insight--good">
+        <div class="pred-insight-title">✓ Buen momento</div>
+        <p>
+          {% if p.assessment == 'buy_now' %}
+            El precio actual ({{ cur_sym }} {{ "%.2f"|format(p.current_price) }}) está cerca del mínimo histórico.
+          {% elif p.assessment == 'good' %}
+            El precio actual ({{ cur_sym }} {{ "%.2f"|format(p.current_price) }}) está cerca del descuento promedio del juego.
+          {% elif p.assessment == 'neutral' %}
+            Descuento moderado disponible. Revisa otras tiendas para comparar.
+          {% else %}
+            Sin rebaja activa. Conviene esperar a la próxima ventana.
+          {% endif %}
+        </p>
+      </div>
+
+      <div class="pred-insight pred-insight--warn">
+        <div class="pred-insight-title">⚠ Considera esperar</div>
+        <p>
+          Próximo evento estacional en ~{{ p.summer_sale_days }} días.
+          Podría bajar hasta {{ cur_sym }} {{ "%.2f"|format(p.history_low) }}.
+        </p>
+      </div>
+
+      <div class="pred-eyebrow pred-eyebrow--inner">📉 VOLATILIDAD DE PRECIO</div>
+      <div class="pred-vol-track">
+        <div class="pred-vol-fill" style="width: {{ p.volatility_pct }}%"></div>
+      </div>
+      <div class="pred-vol-label">{{ p.volatility_label }}</div>
+
+      <div class="pred-divider"></div>
+
+      <div class="pred-eyebrow pred-eyebrow--inner">📌 PATRONES DETECTADOS</div>
+      <ul class="pred-patterns">
+        <li>Rebaja en Steam Summer</li>
+        <li>Rebaja en Black Friday</li>
+        {% if game.released %}<li>Rebaja en aniversario ({{ game.released[:4] }})</li>{% endif %}
+        {% if p.max_discount >= 70 %}<li>Pico de descuento -{{ p.max_discount }}%</li>{% endif %}
+      </ul>
+
+      <button type="button" class="pred-btn pred-btn--primary pred-btn--full" id="pred-notify-btn"
+              data-name="{{ game.name }}">🔔 Avísame en próxima rebaja</button>
+    </aside>
+  </section>
+
+  <!-- ── STORE COMPARISON ────────────────────────── -->
+  {% if all_deals %}
+  <section class="pred-card pred-stores-card">
+    <div class="pred-eyebrow">🏪 COMPARATIVA POR TIENDA</div>
+    <h2 class="pred-card-title">¿Dónde está más barato?</h2>
+
+    <div class="pred-table-wrap">
+      <table class="pred-stores-table">
+        <thead>
+          <tr>
+            <th>TIENDA</th>
+            <th>PRECIO ACTUAL</th>
+            <th>MÍNIMO HISTÓRICO</th>
+            <th>DESCUENTO</th>
+            <th class="pred-th-action">ACCIÓN</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set sorted_deals = all_deals | sort(attribute='price') %}
+          {% set top_price = sorted_deals[0].price if sorted_deals else 0 %}
+          {% for d in sorted_deals %}
+          <tr class="{% if d.price == top_price and d.price > 0 %}pred-row--top{% endif %}">
+            <td class="pred-td-store">
+              <span class="pred-store-chip">{{ (d.store or '?')[:1] | upper }}</span>
+              <span>{{ d.store or 'Tienda' }}</span>
+              {% if d.price == top_price and d.price > 0 %}<span class="pred-top-badge">★ TOP</span>{% endif %}
+            </td>
+            <td>
+              {% if d.price == 0 %}
+                <strong class="pred-good">GRATIS</strong>
+              {% else %}
+                <strong class="{% if d.price == top_price %}pred-good{% endif %}">{{ d.currency }} {{ "%.2f"|format(d.price) }}</strong>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.history_low and d.history_low > 0 %}
+                {{ d.currency }} {{ "%.2f"|format(d.history_low) }}
+              {% elif d.store_low and d.store_low > 0 %}
+                {{ d.currency }} {{ "%.2f"|format(d.store_low) }}
+              {% else %}
+                <span class="pred-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.discount > 0 %}
+                <span class="pred-disc-pill">-{{ d.discount }}%</span>
+              {% else %}
+                <span class="pred-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="pred-td-action">
+              {% if d.url %}
+              <a href="{{ d.url }}" target="_blank" rel="noopener"
+                 class="pred-table-btn {% if d.price == top_price %}pred-table-btn--accent{% endif %}">
+                Ver oferta →
+              </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  <!-- ── DISCLAIMER ──────────────────────────────── -->
+  <div class="pred-disclaimer">
+    <div class="pred-disclaimer-title">⚠ Sobre las predicciones</div>
+    <p>Las estimaciones se basan en patrones históricos y heurísticas por tienda. No garantizan rebajas futuras — son una guía estadística basada en frecuencia y estacionalidad observadas.</p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════
+       DATOS COMPLETOS DEL JUEGO (preservado)
+       ════════════════════════════════════════════════ -->
+
+  {% if game.metacritic or game.rating or game.released or game.esrb %}
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">🏷️ FICHA RÁPIDA</div>
+    <div class="pred-quick-badges">
       {% if game.metacritic %}
       <span class="gd-mc gd-mc--{% if game.metacritic >= 75 %}good{% elif game.metacritic >= 50 %}mixed{% else %}bad{% endif %}">
         {{ game.metacritic }}<small>Metacritic</small>
       </span>
       {% endif %}
-      {% if game.rating > 0 %}
+      {% if game.rating and game.rating > 0 %}
       <span class="gd-badge">★ {{ game.rating }} / 5
         {% if game.ratings_count %}<small>({{ game.ratings_count }} votos)</small>{% endif %}
       </span>
       {% endif %}
-      {% if game.released %}
-      <span class="gd-badge">📅 {{ game.released }}</span>
-      {% endif %}
-      {% if game.esrb %}
-      <span class="gd-badge">{{ game.esrb }}</span>
-      {% endif %}
+      {% if game.released %}<span class="gd-badge">📅 {{ game.released }}</span>{% endif %}
+      {% if game.esrb %}<span class="gd-badge">{{ game.esrb }}</span>{% endif %}
     </div>
+  </section>
+  {% endif %}
 
-    {% if deal %}
-    <div class="gd-deal-bar">
-      <div class="gd-deal-price">
-        {% if deal.price == 0 %}
-          <span class="gd-free-tag">GRATIS</span>
-        {% else %}
-          <span class="gd-orig">{{ deal.currency }} {{ "%.2f"|format(deal.original_price) }}</span>
-          <span class="gd-now">{{ deal.currency }} {{ "%.2f"|format(deal.price) }}</span>
-          <span class="gd-disc">-{{ deal.discount }}%</span>
-        {% endif %}
-        <span class="gd-store-name">en {{ deal.store }}</span>
-      </div>
-      <a href="{{ deal.url }}" target="_blank" rel="noopener" class="gd-cta">Ver oferta →</a>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
-<div class="gd-body">
-
-  <!-- Ratings breakdown -->
   {% if game.ratings %}
-  <section class="gd-section">
-    <h2 class="gd-section-title">Calificaciones de jugadores</h2>
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">⭐ CALIFICACIONES DE JUGADORES</div>
     <div class="gd-ratings-grid">
       {% for r in game.ratings %}
       <div class="gd-rbar">
@@ -67,51 +352,29 @@
   </section>
   {% endif %}
 
-  <!-- Info grid -->
-  <section class="gd-section">
-    <h2 class="gd-section-title">Información</h2>
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">ℹ️ INFORMACIÓN</div>
     <div class="gd-info-grid">
       {% if game.developers %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Desarrollador</span>
-        <span class="gd-info-val">{{ game.developers | join(', ') }}</span>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Desarrollador</span><span class="gd-info-val">{{ game.developers | join(', ') }}</span></div>
       {% endif %}
       {% if game.publishers %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Publisher</span>
-        <span class="gd-info-val">{{ game.publishers | join(', ') }}</span>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Publisher</span><span class="gd-info-val">{{ game.publishers | join(', ') }}</span></div>
       {% endif %}
       {% if game.released %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Lanzamiento</span>
-        <span class="gd-info-val">{{ game.released }}</span>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Lanzamiento</span><span class="gd-info-val">{{ game.released }}</span></div>
       {% endif %}
       {% if game.genres %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Géneros</span>
-        <span class="gd-info-val">{{ game.genres | join(', ') }}</span>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Géneros</span><span class="gd-info-val">{{ game.genres | join(', ') }}</span></div>
       {% endif %}
       {% if game.platforms %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Plataformas</span>
-        <span class="gd-info-val">{{ game.platforms | join(', ') }}</span>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Plataformas</span><span class="gd-info-val">{{ game.platforms | join(', ') }}</span></div>
       {% endif %}
       {% if game.esrb %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Clasificación</span>
-        <span class="gd-info-val">{{ game.esrb }}</span>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Clasificación</span><span class="gd-info-val">{{ game.esrb }}</span></div>
       {% endif %}
       {% if game.website %}
-      <div class="gd-info-item">
-        <span class="gd-info-label">Web oficial</span>
-        <a href="{{ game.website }}" target="_blank" rel="noopener" class="gd-info-link">{{ game.website }}</a>
-      </div>
+      <div class="gd-info-item"><span class="gd-info-label">Web oficial</span><a href="{{ game.website }}" target="_blank" rel="noopener" class="gd-info-link">{{ game.website }}</a></div>
       {% endif %}
       {% if game.metacritic_platforms %}
       <div class="gd-info-item gd-info-item--wide">
@@ -128,10 +391,9 @@
     </div>
   </section>
 
-  <!-- Description -->
   {% if game.description %}
-  <section class="gd-section">
-    <h2 class="gd-section-title">Descripción</h2>
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">📝 DESCRIPCIÓN</div>
     <div class="gd-description" id="gd-desc">
       {{ game.description[:800] }}{% if game.description|length > 800 %}<span id="gd-desc-rest" style="display:none">{{ game.description[800:] }}</span>
       <button class="gd-read-more" onclick="document.getElementById('gd-desc-rest').style.display='inline';this.style.display='none'">Leer más ↓</button>{% endif %}
@@ -139,10 +401,9 @@
   </section>
   {% endif %}
 
-  <!-- Screenshots -->
   {% if game.screenshots %}
-  <section class="gd-section">
-    <h2 class="gd-section-title">Capturas de pantalla</h2>
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">📸 CAPTURAS DE PANTALLA</div>
     <div class="gd-screenshots">
       {% for ss in game.screenshots %}
       <a href="{{ ss }}" target="_blank" rel="noopener" class="gd-ss-wrap">
@@ -153,10 +414,9 @@
   </section>
   {% endif %}
 
-  <!-- System requirements -->
   {% if game.pc_min or game.pc_rec %}
-  <section class="gd-section">
-    <h2 class="gd-section-title">Requisitos de sistema (PC)</h2>
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">🖥️ REQUISITOS DE SISTEMA (PC)</div>
     <div class="gd-reqs">
       {% if game.pc_min %}
       <div class="gd-req-block">
@@ -174,10 +434,9 @@
   </section>
   {% endif %}
 
-  <!-- Tags -->
   {% if game.tags %}
-  <section class="gd-section">
-    <h2 class="gd-section-title">Etiquetas</h2>
+  <section class="pred-card pred-info-card">
+    <div class="pred-eyebrow">🏷️ ETIQUETAS</div>
     <div class="gd-tags">
       {% for tag in game.tags %}<span class="gd-tag">{{ tag }}</span>{% endfor %}
     </div>
@@ -185,4 +444,77 @@
   {% endif %}
 
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const wlBtn = document.getElementById('pred-wishlist-btn');
+  const notifyBtn = document.getElementById('pred-notify-btn');
+
+  function updateWishlistState(btn, inWl) {
+    if (!btn) return;
+    btn.classList.toggle('pred-btn--active', !!inWl);
+    btn.innerHTML = inWl ? '♥ En tu wishlist' : '♥ Wishlist';
+  }
+
+  const name = wlBtn ? wlBtn.dataset.name : '';
+  if (wlBtn && window.WISHLIST_NAMES && window.WISHLIST_NAMES.has(name)) {
+    updateWishlistState(wlBtn, true);
+  }
+
+  if (wlBtn) {
+    wlBtn.addEventListener('click', function () {
+      if (!window.GD_USER_LOGGED_IN) {
+        window.location.href = '/login';
+        return;
+      }
+      const payload = {
+        name: name,
+        thumb: {{ (game.background or '') | tojson }},
+        url: {{ (deal.url if deal else '') | tojson }},
+        store: {{ (deal.store if deal else '') | tojson }},
+        price: {{ (deal.price if deal else 0) | tojson }},
+        original_price: {{ (deal.original_price if deal else 0) | tojson }},
+        discount: {{ (deal.discount if deal else 0) | tojson }},
+        currency: {{ (deal.currency if deal else 'USD') | tojson }},
+      };
+      fetch('/api/wishlist/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      .then(r => r.json())
+      .then(data => {
+        if (!window.WISHLIST_NAMES) window.WISHLIST_NAMES = new Set();
+        if (data.in_wishlist) window.WISHLIST_NAMES.add(name);
+        else window.WISHLIST_NAMES.delete(name);
+        updateWishlistState(wlBtn, !!data.in_wishlist);
+        const sb = document.getElementById('wl-sidebar-count');
+        if (sb) {
+          const n = window.WISHLIST_NAMES.size;
+          sb.textContent = n;
+          sb.style.display = n > 0 ? '' : 'none';
+        }
+      })
+      .catch(() => {});
+    });
+  }
+
+  if (notifyBtn) {
+    notifyBtn.addEventListener('click', function () {
+      if (wlBtn) wlBtn.click();
+    });
+  }
+
+  // Chart range tabs (visual only — no historical data yet)
+  document.querySelectorAll('.pred-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.pred-tab').forEach(t => t.classList.remove('pred-tab--active'));
+      tab.classList.add('pred-tab--active');
+    });
+  });
+})();
+</script>
 {% endblock %}

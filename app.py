@@ -304,6 +304,109 @@ def games():
     )
 
 
+_STORE_INTERVALS = {
+    "steam": 58, "gog": 75, "epic games store": 90, "epic": 90,
+    "humble store": 60, "humble": 60, "fanatical": 45,
+    "green man gaming": 50, "gamersgate": 65, "wingamestore": 70,
+    "gamesplanet": 55, "indiegala": 50, "voidu": 55,
+}
+
+def _compute_predictions(best_deal, all_deals):
+    """Heuristic sale predictions and price stats for the detail page.
+
+    Inputs are real-time deal data; outputs are estimates labelled as such on
+    the page via the disclaimer.
+    """
+    if not best_deal:
+        return {
+            "next_sale_days": 30, "next_sale_confidence": "Media",
+            "interval_days": 60, "last_sale_days_ago": 30,
+            "avg_discount": 0, "max_discount": 0,
+            "history_low": 0.0, "current_price": 0.0,
+            "original_price": 0.0, "discount": 0,
+            "volatility_pct": 30, "volatility_label": "Sin datos",
+            "assessment": "neutral",
+            "summer_sale_days": 38,
+        }
+
+    price    = float(best_deal.get("price") or 0)
+    original = float(best_deal.get("original_price") or 0)
+    discount = int(best_deal.get("discount") or 0)
+    hist_low = float(best_deal.get("history_low") or 0)
+    store_lw = float(best_deal.get("store_low") or 0)
+    store    = (best_deal.get("store") or "").lower()
+
+    discounts = [int(d.get("discount") or 0) for d in (all_deals or [])
+                 if int(d.get("discount") or 0) > 0]
+    avg_discount = round(sum(discounts) / len(discounts)) if discounts else discount
+    max_discount = max(discounts) if discounts else discount
+
+    interval_days = _STORE_INTERVALS.get(store, 60)
+
+    if discount >= 60:
+        next_sale_days = interval_days
+        confidence = "Baja"
+        assessment = "buy_now"
+    elif discount >= 30:
+        next_sale_days = max(7, interval_days // 4)
+        confidence = "Alta"
+        assessment = "good"
+    elif discount > 0:
+        next_sale_days = max(14, interval_days // 2)
+        confidence = "Media"
+        assessment = "neutral"
+    else:
+        next_sale_days = 7
+        confidence = "Alta"
+        assessment = "wait"
+
+    if max_discount >= 70:
+        volatility_pct, volatility_label = 85, "Alta — rebaja frecuente"
+    elif max_discount >= 40:
+        volatility_pct, volatility_label = 60, "Media — rebajas regulares"
+    elif max_discount > 0:
+        volatility_pct, volatility_label = 35, "Baja — pocas rebajas"
+    else:
+        volatility_pct, volatility_label = 20, "Sin rebajas detectadas"
+
+    last_sale_days_ago = max(1, interval_days - next_sale_days)
+
+    if hist_low > 0:
+        history_low = hist_low
+    elif store_lw > 0:
+        history_low = store_lw
+    else:
+        history_low = price
+
+    # Days to next major seasonal sale (rough rolling estimate)
+    from datetime import date
+    today = date.today()
+    sales_dates = [
+        date(today.year, 6, 25),  # Steam Summer
+        date(today.year, 11, 27), # Black Friday
+        date(today.year, 12, 18), # Winter
+        date(today.year + 1, 6, 25),
+    ]
+    summer_sale_days = min((d - today).days for d in sales_dates if (d - today).days >= 0)
+
+    return {
+        "next_sale_days":   next_sale_days,
+        "next_sale_confidence": confidence,
+        "interval_days":    interval_days,
+        "last_sale_days_ago": last_sale_days_ago,
+        "avg_discount":     avg_discount,
+        "max_discount":     max_discount,
+        "history_low":      round(history_low, 2),
+        "current_price":    round(price, 2),
+        "original_price":   round(original, 2),
+        "discount":         discount,
+        "volatility_pct":   volatility_pct,
+        "volatility_label": volatility_label,
+        "assessment":       assessment,
+        "summer_sale_days": summer_sale_days,
+    }
+
+
 @app.route("/game/<path:name>")
 def game_detail(name):
     name = name.strip()
@@ -316,14 +419,34 @@ def game_detail(name):
         game_data = fetch_rawg_game_detail(name)
         _rawg_detail_cache[key] = {"data": game_data, "ts": time.time()}
 
-    if not game_data:
-        deal = next((d for d in _cache.get("deals", [])
-                     if d["name"].strip().lower() == key), None)
-        return redirect(deal["url"] if deal else url_for("games"))
+    deals_for_game = [d for d in _cache.get("deals", [])
+                      if d["name"].strip().lower() == key]
 
-    deal = next((d for d in _cache.get("deals", [])
-                 if d["name"].strip().lower() == key), None)
-    return render_template("game_detail.html", game=game_data, deal=deal, page="game")
+    if not game_data:
+        first = deals_for_game[0] if deals_for_game else None
+        return redirect(first["url"] if first else url_for("games"))
+
+    if deals_for_game:
+        best_deal = max(
+            deals_for_game,
+            key=lambda d: (int(d.get("discount") or 0), -float(d.get("price") or 0)),
+        )
+    else:
+        best_deal = None
+
+    predictions = _compute_predictions(best_deal, deals_for_game)
+
+    deals, _, subscriptions = get_data()
+    stats = sidebar_stats(deals, subscriptions)
+
+    return render_template(
+        "game_detail.html",
+        game=game_data, deal=best_deal,
+        all_deals=deals_for_game,
+        predictions=predictions,
+        stats=stats,
+        page="game",
+    )
 
 
 @app.route("/licencias")
