@@ -31,8 +31,9 @@
     return `${cur.symbol} ${amount.toFixed(cur.decimals)}`;
   }
 
-  // Expose so app.js can use it when rendering cards
-  window.gd_formatPrice = formatAmount;
+  // Expose so app.js / other pages can use it
+  window.gd_formatPrice    = formatAmount;
+  window.gd_applyConversion = applyConversion;
 
   // ── Apply conversion to every [data-usd] element ─────────────
   function applyConversion() {

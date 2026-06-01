@@ -6,6 +6,7 @@
   <title>Verificación 2FA – GAMEDEALS Admin</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/style.css"/>
+  <meta name="csrf-token" content="{{ csrf_token() }}"/>
 </head>
 <body>
   <div class="admin-login-page">
@@ -41,5 +42,19 @@
 
     </div>
   </div>
+  <script>
+    (function () {
+      const token = document.querySelector('meta[name="csrf-token"]');
+      if (!token) return;
+      const val = token.content;
+      document.querySelectorAll('form').forEach(function (form) {
+        if (!form.querySelector('[name="csrf_token"]')) {
+          const inp = document.createElement('input');
+          inp.type = 'hidden'; inp.name = 'csrf_token'; inp.value = val;
+          form.appendChild(inp);
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

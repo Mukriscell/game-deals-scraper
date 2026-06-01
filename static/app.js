@@ -1,3 +1,9 @@
+// ── CSRF helper ─────────────────────────────────────
+function getCsrfToken() {
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  return meta ? meta.content : '';
+}
+
 // ── Elements ────────────────────────────────────────
 const grid        = document.getElementById('deals-grid');
 const emptyState  = document.getElementById('empty-state');
@@ -12,10 +18,30 @@ const btnReset    = document.getElementById('btn-reset');
 const btnReset2   = document.getElementById('btn-reset2');
 
 // ── State ────────────────────────────────────────────
-let query    = '';
-let storeId  = 'All';
-let maxPrice = null;
-let sortBy   = 'discount';
+let query          = '';
+let storeId        = 'All';
+let maxPrice       = null;
+let sortBy         = 'discount';
+let _rawgResults   = [];
+let _filteredCache = [];
+let _visibleCount  = 0;
+const PAGE_SIZE    = 40;
+
+// ── Toast notifications ──────────────────────────────
+(function () {
+  const container = document.createElement('div');
+  container.id = 'toast-container';
+  document.body.appendChild(container);
+})();
+
+function showToast(msg, type) {
+  type = type || 'error';
+  const t = document.createElement('div');
+  t.className = 'toast toast--' + type;
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
 
 // ── Helpers ──────────────────────────────────────────
 function escHtml(str) {
@@ -68,21 +94,42 @@ function voucherHTML(deal) {
   return `<span class="voucher-chip" title="Código de cupón">🎟 ${escHtml(deal.voucher)}</span>`;
 }
 
+function histLowHTML(deal) {
+  if (!deal.history_low || deal.history_low <= 0) return '';
+  const atLow = deal.price > 0 && deal.price <= deal.history_low;
+  const near  = !atLow && deal.price > 0 && deal.price <= deal.history_low * 1.10;
+  if (!atLow && !near) return '';
+  const label = tx('hist_low_lbl');
+  const fmt   = deal.currency + ' ' + deal.history_low.toFixed(2);
+  const cls   = atLow ? 'hist-low--match' : 'hist-low--near';
+  const icon  = atLow ? '🏆 ' : '≈ ';
+  return `<span class="hist-low-tag ${cls}" title="${label}: ${fmt}">${icon}${label}</span>`;
+}
+
+function ownedHTML(deal) {
+  if (!window.COLLECTION_NAMES || !window.COLLECTION_NAMES.has(deal.name)) return '';
+  return `<div class="owned-overlay">${tx('col_owned_badge')}</div>`;
+}
+
 function cardHTML(deal) {
   const thumb = deal.thumb
-    ? `<div class="card-thumb"><img src="${deal.thumb}" alt="${escHtml(deal.name)}" loading="lazy"/></div>`
+    ? `<div class="card-thumb"><img src="${deal.thumb}" alt="${escHtml(deal.name)}" loading="lazy"
+         onload="this.style.opacity=1"
+         onerror="var p=this.parentElement;p.className='card-thumb card-thumb--empty';p.innerHTML='<span>🎮</span>';"/></div>`
     : `<div class="card-thumb card-thumb--empty"><span>🎮</span></div>`;
 
   const kebab = window.GD_USER_LOGGED_IN
     ? `<button class="card-kebab-btn" data-deal="${escHtml(deal.name)}" aria-label="Opciones">⋮</button>`
     : '';
 
+  const owned = window.COLLECTION_NAMES && window.COLLECTION_NAMES.has(deal.name);
   return `
     <a href="/game/${encodeURIComponent(deal.name)}"
-       class="card ${deal.flag==='N'?'card--newlow':''} ${deal.discount>=70?'card--hot':''} ${deal.price===0?'card--free':''}">
+       class="card ${deal.flag==='N'?'card--newlow':''} ${deal.discount>=70?'card--hot':''} ${deal.price===0?'card--free':''} ${owned?'card--owned':''}">
       ${thumb}
       ${badgeHTML(deal)}
       ${flagHTML(deal)}
+      ${ownedHTML(deal)}
       ${kebab}
       <div class="card-body">
         <div class="card-store-row">
@@ -97,6 +144,7 @@ function cardHTML(deal) {
           : `<span class="price-current" data-usd="${deal.price}">${deal.currency} ${deal.price.toFixed(2)}</span>`
         }
         <span class="discount-tag">-${deal.discount}%</span>
+        ${histLowHTML(deal)}
         ${expiryHTML(deal)}
         ${voucherHTML(deal)}
       </div>
@@ -107,12 +155,33 @@ function cardHTML(deal) {
 function applySort(deals) {
   const arr = [...deals];
   switch (sortBy) {
+    case 'popular':    return arr.sort((a,b) => (b.popularity||0) - (a.popularity||0));
     case 'price_asc':  return arr.sort((a,b) => a.price - b.price);
     case 'price_desc': return arr.sort((a,b) => b.price - a.price);
     case 'alpha':      return arr.sort((a,b) => a.name.localeCompare(b.name));
     case 'alpha_desc': return arr.sort((a,b) => b.name.localeCompare(a.name));
     default:           return arr.sort((a,b) => b.discount - a.discount);
   }
+}
+
+function rawgCardHTML(game) {
+  const thumb = game.thumb
+    ? `<div class="card-thumb"><img src="${escHtml(game.thumb)}" alt="${escHtml(game.name)}" loading="lazy"
+         onload="this.style.opacity=1"
+         onerror="var p=this.parentElement;p.className='card-thumb card-thumb--empty';p.innerHTML='<span>🎮</span>';"/></div>`
+    : `<div class="card-thumb card-thumb--empty"><span>🎮</span></div>`;
+  return `
+    <a href="/game/${encodeURIComponent(game.name)}" class="card card--explore">
+      ${thumb}
+      <div class="card-explore-badge">Explorar</div>
+      <div class="card-body">
+        <div class="card-store-row"><span class="card-store">RAWG</span></div>
+        <div class="card-name">${escHtml(game.name)}</div>
+      </div>
+      <div class="card-pricing card-pricing--explore">
+        <span class="card-explore-cta">Ver detalles →</span>
+      </div>
+    </a>`;
 }
 
 // ── Daily deals (expiry ≤ 7 days) ────────────────────
@@ -135,11 +204,26 @@ function renderDailyDeals() {
 
   if (urgent.length === 0) { section.style.display = 'none'; return; }
   section.style.display = '';
-  document.getElementById('daily-deals-grid').innerHTML = urgent.map(cardHTML).join('');
-  document.dispatchEvent(new CustomEvent('deals:rendered'));
+  requestAnimationFrame(() => {
+    document.getElementById('daily-deals-grid').innerHTML = urgent.map(cardHTML).join('');
+    document.dispatchEvent(new CustomEvent('deals:rendered'));
+  });
 }
 
 // ── Filter & Render ───────────────────────────────────
+const loadMoreWrap = document.getElementById('load-more-wrap');
+const loadMoreBtn  = document.getElementById('load-more-btn');
+
+function _updateLoadMoreBtn(total, rawgCount) {
+  const hasMore = _visibleCount < total;
+  if (loadMoreWrap) loadMoreWrap.style.display = hasMore ? 'block' : 'none';
+  if (statVisible) {
+    statVisible.textContent = hasMore
+      ? Math.min(_visibleCount, total) + ' de ' + (total + rawgCount)
+      : total + rawgCount;
+  }
+}
+
 function applyFilters() {
   let filtered = [...ALL_DEALS];
 
@@ -159,46 +243,127 @@ function applyFilters() {
   }
 
   filtered = applySort(filtered);
-  statVisible.textContent = filtered.length;
 
-  if (filtered.length === 0) {
-    grid.innerHTML = '';
-    emptyState.style.display = 'flex';
-  } else {
-    emptyState.style.display = 'none';
-    grid.innerHTML = filtered.map(cardHTML).join('');
-    document.dispatchEvent(new CustomEvent('deals:rendered'));
+  // Append RAWG-only cards when searching (games not already in filtered deals)
+  let extraRawg = [];
+  if (query && _rawgResults.length > 0) {
+    const filteredNames = new Set(filtered.map(d => d.name.toLowerCase()));
+    extraRawg = _rawgResults.filter(g => !filteredNames.has(g.name.toLowerCase()));
   }
+
+  if (filtered.length === 0 && extraRawg.length === 0) {
+    requestAnimationFrame(() => {
+      grid.innerHTML = '';
+      emptyState.style.display = 'flex';
+      if (loadMoreWrap) loadMoreWrap.style.display = 'none';
+      if (statVisible) statVisible.textContent = '0';
+    });
+    return;
+  }
+
+  _filteredCache = filtered;
+  _visibleCount  = PAGE_SIZE;
+
+  requestAnimationFrame(() => {
+    emptyState.style.display = 'none';
+    grid.innerHTML = _filteredCache.slice(0, _visibleCount).map(cardHTML).join('')
+                   + extraRawg.map(rawgCardHTML).join('');
+    document.dispatchEvent(new CustomEvent('deals:rendered'));
+    _updateLoadMoreBtn(_filteredCache.length, extraRawg.length);
+  });
 }
 
+function loadMore() {
+  const start = _visibleCount;
+  _visibleCount += PAGE_SIZE;
+  const next = _filteredCache.slice(start, _visibleCount).map(cardHTML).join('');
+  if (next) {
+    grid.insertAdjacentHTML('beforeend', next);
+    document.dispatchEvent(new CustomEvent('deals:rendered'));
+  }
+  _updateLoadMoreBtn(_filteredCache.length, 0);
+}
+
+if (loadMoreBtn) loadMoreBtn.addEventListener('click', loadMore);
+
 // ── Autocomplete ─────────────────────────────────────
+// ── Search suggestions (local + remote) ──────────────
+let _searchTimer = null;
+
+function _highlightMatch(text, val) {
+  const idx = text.toLowerCase().indexOf(val.toLowerCase());
+  if (idx < 0) return escHtml(text);
+  return escHtml(text.slice(0, idx))
+       + '<strong>' + escHtml(text.slice(idx, idx + val.length)) + '</strong>'
+       + escHtml(text.slice(idx + val.length));
+}
+
+function _renderSuggestions(deals, rawgGames, val) {
+  if (deals.length === 0 && rawgGames.length === 0) {
+    suggestions.classList.remove('active');
+    return;
+  }
+  let html = '';
+  if (deals.length > 0) {
+    html += '<div class="sg-group-label">Ofertas activas</div>';
+    html += deals.map(d =>
+      `<div class="suggestion-item suggestion-item--deal" data-name="${escHtml(d.name)}">
+        <span class="suggestion-name">${_highlightMatch(d.name, val)}</span>
+        <span class="suggestion-store">${escHtml(d.store)}</span>
+      </div>`
+    ).join('');
+  }
+  if (rawgGames.length > 0) {
+    html += '<div class="sg-group-label">Explorar juegos</div>';
+    html += rawgGames.map(g =>
+      `<div class="suggestion-item suggestion-item--rawg" data-url="/game/${encodeURIComponent(g.name)}">
+        <span class="suggestion-name">${_highlightMatch(g.name, val)}</span>
+        <span class="suggestion-badge">Ver detalles →</span>
+      </div>`
+    ).join('');
+  }
+  suggestions.innerHTML = html;
+  suggestions.classList.add('active');
+}
+
 function showSuggestions(val) {
   if (!val || val.length < 2) { suggestions.classList.remove('active'); return; }
   const q = val.toLowerCase();
-  const matches = ALL_DEALS.filter(d => d.name.toLowerCase().includes(q)).slice(0, 8);
 
-  if (matches.length === 0) { suggestions.classList.remove('active'); return; }
+  // Instant local results
+  const localDeals = ALL_DEALS.filter(d => d.name.toLowerCase().includes(q)).slice(0, 5);
+  _renderSuggestions(localDeals, [], val);
 
-  suggestions.innerHTML = matches.map(d => {
-    const idx    = d.name.toLowerCase().indexOf(q);
-    const before = escHtml(d.name.slice(0, idx));
-    const match  = escHtml(d.name.slice(idx, idx + val.length));
-    const after  = escHtml(d.name.slice(idx + val.length));
-    return `<div class="suggestion-item" data-name="${escHtml(d.name)}">
-      ${before}<strong>${match}</strong>${after}
-      <span class="suggestion-store">${escHtml(d.store)}</span>
-    </div>`;
-  }).join('');
-  suggestions.classList.add('active');
+  // Remote results after debounce
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(() => {
+    fetch('/api/search?q=' + encodeURIComponent(val))
+      .then(r => r.json())
+      .then(data => {
+        const localNames = new Set(localDeals.map(d => d.name.toLowerCase()));
+        const remoteDeals = data
+          .filter(r => r.type === 'deal' && !localNames.has(r.name.toLowerCase()))
+          .slice(0, Math.max(0, 5 - localDeals.length));
+        const rawgGames = data.filter(r => r.type === 'rawg').slice(0, 5);
+        _rawgResults = rawgGames;
+        _renderSuggestions([...localDeals, ...remoteDeals], rawgGames, val);
+        applyFilters();
+      })
+      .catch(() => {});
+  }, 350);
 }
 
 suggestions.addEventListener('click', e => {
   const item = e.target.closest('.suggestion-item');
   if (!item) return;
-  searchInput.value = item.dataset.name;
-  query = item.dataset.name;
-  suggestions.classList.remove('active');
-  applyFilters();
+  if (item.dataset.url) {
+    window.location.href = item.dataset.url;
+  } else {
+    searchInput.value = item.dataset.name;
+    query = item.dataset.name;
+    suggestions.classList.remove('active');
+    applyFilters();
+  }
 });
 
 document.addEventListener('click', e => {
@@ -206,16 +371,56 @@ document.addEventListener('click', e => {
 });
 
 // ── Event Listeners ───────────────────────────────────
+let _filterTimer = null;
 searchInput.addEventListener('input', () => {
   query = searchInput.value.trim();
   searchClear.style.display = query ? 'flex' : 'none';
+  _rawgResults = [];
   showSuggestions(searchInput.value);
-  applyFilters();
+  clearTimeout(_filterTimer);
+  _filterTimer = setTimeout(applyFilters, 150);
 });
 
 searchInput.addEventListener('keydown', e => {
-  if (e.key === 'Escape') suggestions.classList.remove('active');
-  if (e.key === 'Enter')  { suggestions.classList.remove('active'); applyFilters(); }
+  if (e.key === 'Escape') { suggestions.classList.remove('active'); return; }
+
+  const items = suggestions.querySelectorAll('.suggestion-item');
+  if (!items.length) {
+    if (e.key === 'Enter') { suggestions.classList.remove('active'); applyFilters(); }
+    return;
+  }
+
+  const active = suggestions.querySelector('.suggestion-item--focus');
+  let idx = Array.from(items).indexOf(active);
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (active) active.classList.remove('suggestion-item--focus');
+    idx = (idx + 1) % items.length;
+    items[idx].classList.add('suggestion-item--focus');
+    items[idx].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (active) active.classList.remove('suggestion-item--focus');
+    idx = idx <= 0 ? items.length - 1 : idx - 1;
+    items[idx].classList.add('suggestion-item--focus');
+    items[idx].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    if (active) {
+      e.preventDefault();
+      if (active.dataset.url) {
+        window.location.href = active.dataset.url;
+      } else {
+        searchInput.value = active.dataset.name;
+        query = active.dataset.name;
+        suggestions.classList.remove('active');
+        applyFilters();
+      }
+    } else {
+      suggestions.classList.remove('active');
+      applyFilters();
+    }
+  }
 });
 
 searchClear.addEventListener('click', () => {
@@ -223,6 +428,7 @@ searchClear.addEventListener('click', () => {
   query = '';
   searchClear.style.display = 'none';
   suggestions.classList.remove('active');
+  _rawgResults = [];
   applyFilters();
 });
 
@@ -266,6 +472,10 @@ document.addEventListener('lang:changed', function () {
       <span class="ckd-icon" id="ckd-wl-icon">🤍</span>
       <span id="ckd-wl-label">Guardar en deseados</span>
     </button>
+    <button class="ckd-item" id="ckd-own">
+      <span class="ckd-icon" id="ckd-own-icon">🎮</span>
+      <span id="ckd-own-label">Ya lo tengo</span>
+    </button>
     <button class="ckd-item" id="ckd-go">
       <span class="ckd-icon">🛒</span> Ir a la oferta
     </button>
@@ -280,9 +490,12 @@ document.addEventListener('lang:changed', function () {
   function openPanel(btn, deal) {
     activeDeal = deal;
     activeBtn  = btn;
-    const inWl = window.WISHLIST_NAMES && window.WISHLIST_NAMES.has(deal.name);
-    document.getElementById('ckd-wl-icon').textContent  = inWl ? '❤️' : '🤍';
-    document.getElementById('ckd-wl-label').textContent = inWl ? 'En deseados' : 'Guardar en deseados';
+    const inWl  = window.WISHLIST_NAMES    && window.WISHLIST_NAMES.has(deal.name);
+    const inCol = window.COLLECTION_NAMES  && window.COLLECTION_NAMES.has(deal.name);
+    document.getElementById('ckd-wl-icon').textContent  = inWl  ? '❤️' : '🤍';
+    document.getElementById('ckd-wl-label').textContent = inWl  ? (window.GD_tx ? window.GD_tx('menu_in_wishlist') : 'En deseados') : (window.GD_tx ? window.GD_tx('menu_wishlist') : 'Guardar en deseados');
+    document.getElementById('ckd-own-icon').textContent  = inCol ? '✅' : '🎮';
+    document.getElementById('ckd-own-label').textContent = inCol ? (window.GD_tx ? window.GD_tx('menu_unown') : 'Quitar de mi colección') : (window.GD_tx ? window.GD_tx('menu_own') : 'Ya lo tengo');
 
     const r = btn.getBoundingClientRect();
     panel.style.top   = (r.bottom + window.scrollY + 6) + 'px';
@@ -308,11 +521,12 @@ document.addEventListener('lang:changed', function () {
     closePanel();
     fetch('/api/wishlist/toggle', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify(deal),
     })
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(data => {
+        if (typeof data.in_wishlist === 'undefined') throw new Error('bad response');
         if (!window.WISHLIST_NAMES) window.WISHLIST_NAMES = new Set();
         if (data.in_wishlist) {
           window.WISHLIST_NAMES.add(deal.name);
@@ -330,7 +544,32 @@ document.addEventListener('lang:changed', function () {
         applyFilters();
         renderDailyDeals();
       })
-      .catch(() => {});
+      .catch(() => showToast(window.GD_tx ? window.GD_tx('wl_err') : 'Error al actualizar la lista de deseados', 'error'));
+  });
+
+  // Collection toggle
+  document.getElementById('ckd-own').addEventListener('click', function () {
+    if (!activeDeal) return;
+    const deal = activeDeal;
+    closePanel();
+    fetch('/api/collection/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body: JSON.stringify({ name: deal.name }),
+    })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        if (typeof data.in_collection === 'undefined') throw new Error('bad response');
+        if (!window.COLLECTION_NAMES) window.COLLECTION_NAMES = new Set();
+        if (data.in_collection) {
+          window.COLLECTION_NAMES.add(deal.name);
+        } else {
+          window.COLLECTION_NAMES.delete(deal.name);
+        }
+        applyFilters();
+        renderDailyDeals();
+      })
+      .catch(() => showToast(window.GD_tx ? window.GD_tx('col_err') : 'Error al actualizar la colección', 'error'));
   });
 
   // Go to deal
@@ -348,7 +587,7 @@ document.addEventListener('lang:changed', function () {
     closePanel();
     fetch('/api/deals/hide', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({ name }),
     }).catch(() => {});
     if (!window.HIDDEN_NAMES) window.HIDDEN_NAMES = new Set();
@@ -395,7 +634,7 @@ document.addEventListener('lang:changed', function () {
     searchTimer = setTimeout(() => {
       fetch('/api/log/search', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ query: q }),
       }).catch(() => {});
     }, 1500);
@@ -410,7 +649,7 @@ document.addEventListener('lang:changed', function () {
     if (!nameEl) return;
     fetch('/api/log/click', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
       body: JSON.stringify({
         name:  nameEl.textContent.trim(),
         store: storeEl ? storeEl.textContent.trim() : '',
@@ -429,8 +668,9 @@ document.addEventListener('lang:changed', function () {
 
   const dots    = document.querySelectorAll('.carousel-dot');
   const carousel = document.getElementById('carousel');
-  let current   = 0;
-  let timer     = null;
+  let current    = 0;
+  let timer      = null;
+  let _isHovering = false;
 
   function goTo(idx) {
     current = (idx + total) % total;
@@ -440,6 +680,7 @@ document.addEventListener('lang:changed', function () {
 
   function startAuto() {
     clearInterval(timer);
+    if (_isHovering) return;
     timer = setInterval(() => goTo(current + 1), 5000);
   }
 
@@ -450,8 +691,8 @@ document.addEventListener('lang:changed', function () {
 
   dots.forEach((d, i) => d.addEventListener('click', () => { goTo(i); startAuto(); }));
 
-  carousel.addEventListener('mouseenter', () => clearInterval(timer));
-  carousel.addEventListener('mouseleave', startAuto);
+  carousel.addEventListener('mouseenter', () => { _isHovering = true; clearInterval(timer); });
+  carousel.addEventListener('mouseleave', () => { _isHovering = false; startAuto(); });
 
   let touchX = 0;
   carousel.addEventListener('touchstart', e => { touchX = e.touches[0].clientX; }, { passive: true });

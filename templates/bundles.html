@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Bundles — BALATO{% endblock %}
+{% block tagline %}Bundles y packs de juegos{% endblock %}
+
+{% block main %}
+<div class="page-wrap">
+
+  <div class="page-hdr">
+    <h1 class="page-hdr-title">🎁 Bundles activos</h1>
+    <p class="page-hdr-sub">Packs de juegos de Humble Bundle, Fanatical y más</p>
+  </div>
+
+  {% if bundles %}
+  <div class="bundle-grid">
+    {% for b in bundles %}
+    <a class="bundle-card" href="{{ b.url }}" target="_blank" rel="noopener noreferrer">
+      <div class="bundle-card-img-wrap">
+        {% if b.image %}
+        <img src="{{ b.image }}" alt="{{ b.name }}" loading="lazy" onerror="this.parentElement.style.display='none'">
+        {% else %}
+        <div class="bundle-card-img-placeholder">🎁</div>
+        {% endif %}
+        <span class="bundle-card-store">{{ b.store }}</span>
+      </div>
+      <div class="bundle-card-body">
+        <h3 class="bundle-card-name">{{ b.name }}</h3>
+        <div class="bundle-card-meta">
+          {% if b.from_price and b.from_price > 0 %}
+          <span class="bundle-card-price">Desde ${{ "%.2f"|format(b.from_price) }}</span>
+          {% endif %}
+          {% if b.tiers and b.tiers > 1 %}
+          <span class="bundle-card-tiers">{{ b.tiers }} niveles</span>
+          {% endif %}
+          {% if b.end_date %}
+          <span class="bundle-card-expiry">⏰ {{ b.end_date }}</span>
+          {% endif %}
+        </div>
+        <span class="bundle-card-cta">Ver bundle →</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="empty-state">
+    <div class="empty-state-icon">🎁</div>
+    <h2 class="empty-state-title">Sin bundles disponibles</h2>
+    <p class="empty-state-text">
+      No se encontraron bundles activos en este momento.<br>
+      Vuelve más tarde o revisa directamente en
+      <a href="https://www.humblebundle.com/bundles" target="_blank" rel="noopener">Humble Bundle</a>
+      y <a href="https://www.fanatical.com/en/bundle" target="_blank" rel="noopener">Fanatical</a>.
+    </p>
+    <a href="/games" class="stg-btn-primary" style="display:inline-block;text-decoration:none;margin-top:1rem">
+      ← Ver ofertas de juegos
+    </a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

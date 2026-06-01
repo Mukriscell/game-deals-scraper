@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Mis Deseados – GAMEDEALS{% endblock %}
+{% block title %}Mis Deseados – BALATO{% endblock %}
 {% block tagline %}Tu lista de juegos guardados{% endblock %}
 
 {% block main %}
@@ -14,6 +14,14 @@
         <span class="stat-num" id="wl-count">{{ items | length }}</span>
         <span class="stat-label">Guardados</span>
       </div>
+      {% if items %}
+      <select id="wl-sort" class="wl-sort-select" title="Ordenar lista">
+        <option value="default">Recientes</option>
+        <option value="price-asc">Menor precio</option>
+        <option value="disc-desc">Mayor descuento</option>
+        <option value="name-asc">A–Z</option>
+      </select>
+      {% endif %}
     </div>
   </div>
 
@@ -21,12 +29,20 @@
   <p class="wl-note">Los precios mostrados son los del momento en que guardaste cada oferta.</p>
   <div class="deals-grid" id="wl-grid">
     {% for item in items %}
-    <div class="wl-item" data-name="{{ item.deal_name | e }}">
+    <div class="wl-item"
+         data-name="{{ item.deal_name | e }}"
+         data-price="{{ item.deal_price }}"
+         data-disc="{{ item.deal_disc }}"
+         data-store="{{ item.deal_store | e }}"
+         data-currency="{{ item.deal_currency | e }}"
+         data-alert="{{ item.price_alert if item.price_alert is not none else '' }}">
       <a href="{{ item.deal_url }}" target="_blank" rel="noopener"
          class="card {{ 'card--free' if item.deal_price == 0 }} {{ 'card--hot' if item.deal_disc >= 70 }}">
         {% if item.deal_thumb %}
         <div class="card-thumb">
-          <img src="{{ item.deal_thumb }}" alt="{{ item.deal_name | e }}" loading="lazy"/>
+          <img src="{{ item.deal_thumb }}" alt="{{ item.deal_name | e }}" loading="lazy"
+               onload="this.style.opacity=1"
+               onerror="var p=this.parentElement;p.className='card-thumb card-thumb--empty';p.innerHTML='<span>🎮</span>';"/>
         </div>
         {% else %}
         <div class="card-thumb card-thumb--empty"><span>🎮</span></div>
@@ -56,7 +72,28 @@
           <span class="discount-tag">-{{ item.deal_disc }}%</span>
         </div>
       </a>
-      <button class="wl-remove-btn" data-name="{{ item.deal_name | e }}" title="Quitar de deseados">✕</button>
+      <div class="wl-item-actions">
+        <button class="wl-alert-btn" data-name="{{ item.deal_name | e }}" title="Configurar alerta de precio">
+          🔔{% if item.price_alert is not none %} {{ item.deal_currency }} {{ "%.2f" | format(item.price_alert) }}{% endif %}
+        </button>
+        <button class="wl-remove-btn" data-name="{{ item.deal_name | e }}" title="Quitar de deseados" aria-label="Quitar de deseados">✕</button>
+      </div>
+      <div class="wl-alert-panel" id="wl-alert-{{ loop.index }}" style="display:none">
+        <label class="wl-alert-label">🔔 Alerta de precio
+          {% if item.price_alert is not none %}
+          <span class="wl-alert-active-chip">Activa: {{ item.deal_currency }} {{ "%.2f" | format(item.price_alert) }}</span>
+          {% endif %}
+        </label>
+        <div class="wl-alert-row">
+          <input type="number" class="wl-alert-input" min="0" step="0.01"
+                 placeholder="Precio objetivo ({{ item.deal_currency }})"
+                 value="{{ item.price_alert if item.price_alert is not none else '' }}"/>
+          <button class="wl-alert-save btn-save" data-name="{{ item.deal_name | e }}">Guardar</button>
+          {% if item.price_alert is not none %}
+          <button class="wl-alert-clear" data-name="{{ item.deal_name | e }}">Quitar</button>
+          {% endif %}
+        </div>
+      </div>
     </div>
     {% endfor %}
   </div>
@@ -92,29 +129,153 @@
       }
     }
 
+    const sortSelect = document.getElementById('wl-sort');
+    if (sortSelect && grid) {
+      sortSelect.addEventListener('change', function () {
+        const items = [...grid.querySelectorAll('.wl-item')];
+        const v = sortSelect.value;
+        if (v !== 'default') {
+          items.sort(function (a, b) {
+            if (v === 'price-asc') return parseFloat(a.dataset.price) - parseFloat(b.dataset.price);
+            if (v === 'disc-desc') return parseFloat(b.dataset.disc) - parseFloat(a.dataset.disc);
+            if (v === 'name-asc') return a.dataset.name.localeCompare(b.dataset.name);
+            return 0;
+          });
+        }
+        items.forEach(function (item) { grid.appendChild(item); });
+      });
+    }
+
+    function getCsrf() {
+      const m = document.querySelector('meta[name="csrf-token"]');
+      return m ? m.content : '';
+    }
+
+    function tx(key, fallback) {
+      return (window.GD_tx ? window.GD_tx(key) : null) || fallback;
+    }
+
     document.querySelectorAll('.wl-remove-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        const name = btn.dataset.name;
-        const item = btn.closest('.wl-item');
-        fetch('/api/wishlist/toggle', {
+        const name    = btn.dataset.name;
+        const wlItem  = btn.closest('.wl-item');
+        const actions = btn.closest('.wl-item-actions');
+        if (!actions) return;
+
+        // Show inline confirmation row
+        const prev = actions.querySelector('.wl-remove-confirm-row');
+        if (prev) { prev.remove(); btn.style.display = ''; return; }
+
+        btn.style.display = 'none';
+        const row = document.createElement('div');
+        row.className = 'wl-remove-confirm-row';
+        row.innerHTML =
+          '<span class="wl-remove-confirm-txt">' + tx('wl_remove_confirm', '¿Quitar de deseados?') + '</span>' +
+          '<button class="wl-remove-confirm-yes">' + tx('wl_remove_yes', 'Sí, quitar') + '</button>' +
+          '<button class="wl-remove-confirm-no">'  + tx('wl_remove_no',  'Cancelar')   + '</button>';
+        actions.appendChild(row);
+
+        row.querySelector('.wl-remove-confirm-no').addEventListener('click', function () {
+          row.remove();
+          btn.style.display = '';
+        });
+
+        row.querySelector('.wl-remove-confirm-yes').addEventListener('click', function () {
+          fetch('/api/wishlist/toggle', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+            body: JSON.stringify({ name: name }),
+          })
+            .then(function () {
+              if (wlItem) wlItem.remove();
+              updateCount();
+              if (window.WISHLIST_NAMES) window.WISHLIST_NAMES.delete(name);
+              const sb = document.getElementById('wl-sidebar-count');
+              if (sb && window.WISHLIST_NAMES) {
+                const n = window.WISHLIST_NAMES.size;
+                sb.textContent = n;
+                sb.style.display = n > 0 ? '' : 'none';
+              }
+            })
+            .catch(function () {
+              row.remove();
+              btn.style.display = '';
+              if (window.showToast) showToast(tx('wl_err', 'Error al actualizar la lista de deseados'), 'error');
+            });
+        });
+      });
+    });
+
+    // ── Price alert panel ─────────────────────────────
+    document.querySelectorAll('.wl-alert-btn').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        const item  = btn.closest('.wl-item');
+        const panel = item ? item.querySelector('.wl-alert-panel') : null;
+        if (!panel) return;
+        const isOpen = panel.style.display !== 'none';
+        document.querySelectorAll('.wl-alert-panel').forEach(function (p) { p.style.display = 'none'; });
+        if (!isOpen) panel.style.display = '';
+      });
+    });
+
+    document.querySelectorAll('.wl-alert-save').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const panel = btn.closest('.wl-alert-panel');
+        const item  = btn.closest('.wl-item');
+        const input = panel ? panel.querySelector('.wl-alert-input') : null;
+        if (!input) return;
+        const name  = btn.dataset.name;
+        const price = input.value !== '' ? parseFloat(input.value) : null;
+        if (price !== null && (isNaN(price) || price < 0)) {
+          if (window.showToast) showToast(tx('wl_price_invalid', 'Precio inválido'), 'error');
+          return;
+        }
+        fetch('/api/wishlist/alert', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name }),
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+          body: JSON.stringify({ name: name, price: price }),
         })
-          .then(function () {
-            if (item) item.remove();
-            updateCount();
-            // Keep client-side WISHLIST_NAMES in sync
-            if (window.WISHLIST_NAMES) window.WISHLIST_NAMES.delete(name);
-            const sb = document.getElementById('wl-sidebar-count');
-            if (sb && window.WISHLIST_NAMES) {
-              const n = window.WISHLIST_NAMES.size;
-              sb.textContent = n;
-              sb.style.display = n > 0 ? '' : 'none';
+          .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+          .then(function (data) {
+            if (panel) panel.style.display = 'none';
+            // Update the alert button label
+            const alertBtn = item ? item.querySelector('.wl-alert-btn') : null;
+            if (alertBtn) {
+              const cur = item.dataset.currency || 'USD';
+              alertBtn.textContent = price !== null
+                ? '🔔 ' + cur + ' ' + price.toFixed(2)
+                : '🔔';
             }
           })
-          .catch(function () {});
+          .catch(function () { if (window.showToast) showToast(tx('wl_alert_err', 'Error al guardar la alerta'), 'error'); });
       });
+    });
+
+    document.querySelectorAll('.wl-alert-clear').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        const panel = btn.closest('.wl-alert-panel');
+        const item  = btn.closest('.wl-item');
+        const name  = btn.dataset.name;
+        fetch('/api/wishlist/alert', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+          body: JSON.stringify({ name: name, price: null }),
+        })
+          .then(function (r) { if (!r.ok) throw new Error(); })
+          .then(function () {
+            if (panel) panel.style.display = 'none';
+            const alertBtn = item ? item.querySelector('.wl-alert-btn') : null;
+            if (alertBtn) alertBtn.textContent = '🔔';
+          })
+          .catch(function () { if (window.showToast) showToast(tx('wl_alert_err', 'Error al quitar la alerta'), 'error'); });
+      });
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('.wl-alert-btn') && !e.target.closest('.wl-alert-panel')) {
+        document.querySelectorAll('.wl-alert-panel').forEach(function (p) { p.style.display = 'none'; });
+      }
     });
   })();
 </script>

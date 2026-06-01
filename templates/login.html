@@ -12,6 +12,10 @@
     <div class="auth-success">¡Cuenta creada! Ya puedes iniciar sesión.</div>
     {% endif %}
 
+    {% if request.args.get('reset') %}
+    <div class="auth-success">¡Contraseña actualizada! Ya puedes iniciar sesión.</div>
+    {% endif %}
+
     {% if error %}
     <div class="auth-error">{{ error }}</div>
     {% endif %}
@@ -37,6 +41,9 @@
       <button type="submit" class="auth-submit">Entrar</button>
     </form>
 
+    <p class="auth-footer" style="margin-bottom:.4rem">
+      <a href="/forgot-password">¿Olvidaste tu contraseña?</a>
+    </p>
     <p class="auth-footer">¿No tienes cuenta? <a href="/register">Regístrate gratis</a></p>
   </div>
 </div>

@@ -68,7 +68,8 @@
     <a href="{{ game.itad_url }}" target="_blank" rel="noopener" class="card card--sub">
       <div class="card-thumb">
         <img src="{{ game.banner }}" alt="{{ game.title }}" loading="lazy"
-             onerror="this.parentElement.classList.add('card-thumb--empty');this.remove()"/>
+             onload="this.style.opacity=1"
+             onerror="var p=this.parentElement;p.className='card-thumb card-thumb--empty';p.innerHTML='<span>🎮</span>';"/>
       </div>
       <div class="badge badge--sub">♾ SUSCRIPCIÓN</div>
       <div class="card-body">

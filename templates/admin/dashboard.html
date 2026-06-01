@@ -6,6 +6,7 @@
   <title>Admin Panel – GAMEDEALS</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/style.css"/>
+  <meta name="csrf-token" content="{{ csrf_token() }}"/>
 </head>
 <body class="admin-body">
 
@@ -116,6 +117,19 @@
             <button class="admin-btn admin-btn--primary" type="submit">⟳ Forzar actualización</button>
           </form>
         </div>
+      </section>
+
+      <!-- Newsletter -->
+      <section class="admin-section">
+        <h2 class="admin-section-title">📬 Newsletter</h2>
+        <p style="color:#8892a0;font-size:.88rem;margin-bottom:.8rem">
+          Envía el newsletter ahora con las mejores ofertas a todos los suscriptores.
+          Normalmente se envía automáticamente cada 7 días.
+        </p>
+        <form method="POST" action="/admin/newsletter/send"
+              onsubmit="return confirm('¿Enviar newsletter a todos los suscriptores ahora?')">
+          <button class="admin-btn admin-btn--primary" type="submit">📨 Enviar newsletter ahora</button>
+        </form>
       </section>
 
     </div><!-- /tab-overview -->
@@ -755,6 +769,19 @@
     // Restore tab from URL hash
     const hash = location.hash.replace('#', '');
     if (hash && document.getElementById(hash)) activateTab(hash);
+
+    (function () {
+      const token = document.querySelector('meta[name="csrf-token"]');
+      if (!token) return;
+      const val = token.content;
+      document.querySelectorAll('form').forEach(function (form) {
+        if (!form.querySelector('[name="csrf_token"]')) {
+          const inp = document.createElement('input');
+          inp.type = 'hidden'; inp.name = 'csrf_token'; inp.value = val;
+          form.appendChild(inp);
+        }
+      });
+    })();
   </script>
 
 </body>

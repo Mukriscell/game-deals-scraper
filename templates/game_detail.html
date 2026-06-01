@@ -6,7 +6,7 @@
 <div class="gd-hero" style="background-image: url('{{ game.background }}')">
   <div class="gd-hero-overlay"></div>
   <div class="gd-hero-content">
-    <a href="/games" class="gd-back">← Volver a ofertas</a>
+    <a href="/games" class="gd-back" data-i18n="gd_back">← Volver a ofertas</a>
     <h1 class="gd-title">{{ game.name }}</h1>
 
     <div class="gd-hero-badges">
@@ -34,24 +34,85 @@
         {% if deal.price == 0 %}
           <span class="gd-free-tag">GRATIS</span>
         {% else %}
-          <span class="gd-orig">{{ deal.currency }} {{ "%.2f"|format(deal.original_price) }}</span>
-          <span class="gd-now">{{ deal.currency }} {{ "%.2f"|format(deal.price) }}</span>
+          <span class="gd-orig" data-usd="{{ deal.original_price }}">{{ deal.currency }} {{ "%.2f"|format(deal.original_price) }}</span>
+          <span class="gd-now" data-usd="{{ deal.price }}">{{ deal.currency }} {{ "%.2f"|format(deal.price) }}</span>
           <span class="gd-disc">-{{ deal.discount }}%</span>
         {% endif %}
-        <span class="gd-store-name">en {{ deal.store }}</span>
+        <span class="gd-store-name"><span data-i18n="gd_in">en</span> {{ deal.store }}</span>
       </div>
-      <a href="{{ deal.url }}" target="_blank" rel="noopener" class="gd-cta">Ver oferta →</a>
+      <a href="{{ deal.url }}" target="_blank" rel="noopener" class="gd-cta" data-i18n="gd_offer_cta">Ver oferta →</a>
     </div>
     {% endif %}
   </div>
 </div>
 
+<!-- ── Sticky Tab Navigation ─────────────────────────── -->
+<nav class="gd-tabs" id="gd-tabs">
+  <div class="gd-tabs-inner">
+    <a class="gd-tab" href="#sec-offers"   data-sec="sec-offers"   data-i18n="gd_tab_offers">Ofertas</a>
+    <a class="gd-tab" href="#sec-dlcs"     data-sec="sec-dlcs"     data-i18n="gd_tab_dlcs">DLCs</a>
+    <a class="gd-tab" href="#sec-articles" data-sec="sec-articles"  data-i18n="gd_tab_arts">Artículos</a>
+    <a class="gd-tab" href="#sec-streams"  data-sec="sec-streams"   data-i18n="gd_tab_streams">Streams</a>
+    <a class="gd-tab" href="#sec-similar"  data-sec="sec-similar"   data-i18n="gd_tab_similar">Juegos similares</a>
+  </div>
+</nav>
+
 <div class="gd-body">
 
-  <!-- Ratings breakdown -->
+  <!-- ── Offers ───────────────────────────────────────── -->
+  <section class="gd-section" id="sec-offers">
+    <h2 class="gd-section-title" data-i18n="gd_sec_offers">Ofertas</h2>
+    <div id="offers-content">
+      <div class="sec-loading">
+        <span class="sec-spinner"></span> Cargando ofertas...
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DLCs ─────────────────────────────────────────── -->
+  <section class="gd-section" id="sec-dlcs">
+    <h2 class="gd-section-title" data-i18n="gd_sec_dlcs">DLCs y expansiones</h2>
+    <div id="dlcs-content">
+      <div class="sec-loading">
+        <span class="sec-spinner"></span> Cargando DLCs...
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Articles ─────────────────────────────────────── -->
+  <section class="gd-section" id="sec-articles">
+    <h2 class="gd-section-title" data-i18n="gd_sec_arts">Artículos</h2>
+    <div id="articles-content">
+      <div class="sec-loading">
+        <span class="sec-spinner"></span> Cargando artículos...
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Streams ───────────────────────────────────────── -->
+  <section class="gd-section" id="sec-streams">
+    <h2 class="gd-section-title" data-i18n="gd_sec_streams">Streams en vivo</h2>
+    <div id="streams-content">
+      <div class="sec-loading">
+        <span class="sec-spinner"></span> Cargando streams...
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Similar Games ─────────────────────────────────── -->
+  <section class="gd-section" id="sec-similar">
+    <h2 class="gd-section-title" data-i18n="gd_sec_similar">Juegos similares</h2>
+    <div id="similar-content">
+      <div class="sec-loading">
+        <span class="sec-spinner"></span> Cargando juegos similares...
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Ratings breakdown ──────────────────────────────── -->
   {% if game.ratings %}
   <section class="gd-section">
-    <h2 class="gd-section-title">Calificaciones de jugadores</h2>
+    <h2 class="gd-section-title" data-i18n="gd_sec_ratings">Calificaciones de jugadores</h2>
     <div class="gd-ratings-grid">
       {% for r in game.ratings %}
       <div class="gd-rbar">
@@ -67,55 +128,55 @@
   </section>
   {% endif %}
 
-  <!-- Info grid -->
+  <!-- ── Info grid ─────────────────────────────────────── -->
   <section class="gd-section">
-    <h2 class="gd-section-title">Información</h2>
+    <h2 class="gd-section-title" data-i18n="gd_sec_info">Información</h2>
     <div class="gd-info-grid">
       {% if game.developers %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Desarrollador</span>
+        <span class="gd-info-label" data-i18n="gd_info_dev">Desarrollador</span>
         <span class="gd-info-val">{{ game.developers | join(', ') }}</span>
       </div>
       {% endif %}
       {% if game.publishers %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Publisher</span>
+        <span class="gd-info-label" data-i18n="gd_info_pub">Publisher</span>
         <span class="gd-info-val">{{ game.publishers | join(', ') }}</span>
       </div>
       {% endif %}
       {% if game.released %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Lanzamiento</span>
+        <span class="gd-info-label" data-i18n="gd_info_rel">Lanzamiento</span>
         <span class="gd-info-val">{{ game.released }}</span>
       </div>
       {% endif %}
       {% if game.genres %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Géneros</span>
+        <span class="gd-info-label" data-i18n="gd_info_genres">Géneros</span>
         <span class="gd-info-val">{{ game.genres | join(', ') }}</span>
       </div>
       {% endif %}
       {% if game.platforms %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Plataformas</span>
+        <span class="gd-info-label" data-i18n="gd_info_plat">Plataformas</span>
         <span class="gd-info-val">{{ game.platforms | join(', ') }}</span>
       </div>
       {% endif %}
       {% if game.esrb %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Clasificación</span>
+        <span class="gd-info-label" data-i18n="gd_info_esrb">Clasificación</span>
         <span class="gd-info-val">{{ game.esrb }}</span>
       </div>
       {% endif %}
       {% if game.website %}
       <div class="gd-info-item">
-        <span class="gd-info-label">Web oficial</span>
+        <span class="gd-info-label" data-i18n="gd_info_web">Web oficial</span>
         <a href="{{ game.website }}" target="_blank" rel="noopener" class="gd-info-link">{{ game.website }}</a>
       </div>
       {% endif %}
       {% if game.metacritic_platforms %}
       <div class="gd-info-item gd-info-item--wide">
-        <span class="gd-info-label">Metacritic por plataforma</span>
+        <span class="gd-info-label" data-i18n="gd_info_mc">Metacritic por plataforma</span>
         <span class="gd-info-val">
           {% for mp in game.metacritic_platforms %}
           <span class="gd-mc-plat gd-mc--{% if mp.metascore >= 75 %}good{% elif mp.metascore >= 50 %}mixed{% else %}bad{% endif %}">
@@ -128,45 +189,72 @@
     </div>
   </section>
 
-  <!-- Description -->
+  <!-- ── Description ───────────────────────────────────── -->
   {% if game.description %}
   <section class="gd-section">
-    <h2 class="gd-section-title">Descripción</h2>
+    <h2 class="gd-section-title" data-i18n="gd_sec_desc">Descripción</h2>
     <div class="gd-description" id="gd-desc">
       {{ game.description[:800] }}{% if game.description|length > 800 %}<span id="gd-desc-rest" style="display:none">{{ game.description[800:] }}</span>
-      <button class="gd-read-more" onclick="document.getElementById('gd-desc-rest').style.display='inline';this.style.display='none'">Leer más ↓</button>{% endif %}
+      <button class="gd-read-more" onclick="document.getElementById('gd-desc-rest').style.display='inline';this.style.display='none'" data-i18n="gd_read_more">Leer más ↓</button>{% endif %}
     </div>
   </section>
   {% endif %}
 
-  <!-- Screenshots -->
+  <!-- ── Price history ─────────────────────────────────── -->
+  <section class="gd-section" id="gd-history-section">
+    <h2 class="gd-section-title" data-i18n="gd_sec_history">Historial de precios</h2>
+
+    <div class="gd-insights" id="gd-insights">
+      <div class="gd-insight-item">
+        <span class="gd-ins-label" data-i18n="gd_ins_min">Mínimo histórico</span>
+        <span class="gd-ins-val" id="gd-ins-min">—</span>
+      </div>
+      <div class="gd-insight-item">
+        <span class="gd-ins-label" data-i18n="gd_ins_disc">Descuento promedio</span>
+        <span class="gd-ins-val" id="gd-ins-disc">—</span>
+      </div>
+      <div class="gd-insight-item">
+        <span class="gd-ins-label" data-i18n="gd_ins_days">Última oferta</span>
+        <span class="gd-ins-val" id="gd-ins-days">—</span>
+      </div>
+    </div>
+
+    <p class="gd-freq-label" id="gd-freq-label" style="display:none"></p>
+
+    <div class="gd-chart-wrap">
+      <canvas id="gd-price-chart"></canvas>
+      <p class="gd-chart-loading" id="gd-chart-msg" data-i18n="gd_hist_load">Cargando historial...</p>
+    </div>
+  </section>
+
+  <!-- ── Screenshots ───────────────────────────────────── -->
   {% if game.screenshots %}
   <section class="gd-section">
-    <h2 class="gd-section-title">Capturas de pantalla</h2>
+    <h2 class="gd-section-title" data-i18n="gd_sec_ss">Capturas de pantalla</h2>
     <div class="gd-screenshots">
       {% for ss in game.screenshots %}
-      <a href="{{ ss }}" target="_blank" rel="noopener" class="gd-ss-wrap">
-        <img src="{{ ss }}" alt="Screenshot" loading="lazy" class="gd-ss-img">
+      <a href="#" class="gd-ss-wrap" data-src="{{ ss }}" data-idx="{{ loop.index0 }}">
+        <img src="{{ ss }}" alt="{{ game.name | e }} — Screenshot {{ loop.index }}" loading="lazy" class="gd-ss-img">
       </a>
       {% endfor %}
     </div>
   </section>
   {% endif %}
 
-  <!-- System requirements -->
+  <!-- ── System requirements ───────────────────────────── -->
   {% if game.pc_min or game.pc_rec %}
   <section class="gd-section">
-    <h2 class="gd-section-title">Requisitos de sistema (PC)</h2>
+    <h2 class="gd-section-title" data-i18n="gd_sec_reqs">Requisitos de sistema (PC)</h2>
     <div class="gd-reqs">
       {% if game.pc_min %}
       <div class="gd-req-block">
-        <h3 class="gd-req-title">Mínimos</h3>
+        <h3 class="gd-req-title" data-i18n="gd_req_min">Mínimos</h3>
         <div class="gd-req-text">{{ game.pc_min | safe }}</div>
       </div>
       {% endif %}
       {% if game.pc_rec %}
       <div class="gd-req-block">
-        <h3 class="gd-req-title">Recomendados</h3>
+        <h3 class="gd-req-title" data-i18n="gd_req_rec">Recomendados</h3>
         <div class="gd-req-text">{{ game.pc_rec | safe }}</div>
       </div>
       {% endif %}
@@ -174,10 +262,10 @@
   </section>
   {% endif %}
 
-  <!-- Tags -->
+  <!-- ── Tags ──────────────────────────────────────────── -->
   {% if game.tags %}
   <section class="gd-section">
-    <h2 class="gd-section-title">Etiquetas</h2>
+    <h2 class="gd-section-title" data-i18n="gd_sec_tags">Etiquetas</h2>
     <div class="gd-tags">
       {% for tag in game.tags %}<span class="gd-tag">{{ tag }}</span>{% endfor %}
     </div>
@@ -185,4 +273,392 @@
   {% endif %}
 
 </div>
+
+<!-- ── Lightbox ──────────────────────────────────────── -->
+<div id="gd-lightbox" class="gd-lb" role="dialog" aria-modal="true" aria-hidden="true">
+  <button class="gd-lb-close" aria-label="Cerrar">✕</button>
+  <button class="gd-lb-prev" aria-label="Anterior">&#8249;</button>
+  <button class="gd-lb-next" aria-label="Siguiente">&#8250;</button>
+  <img class="gd-lb-img" src="" alt="Screenshot">
+  <div class="gd-lb-counter"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+  const gameName = {{ (deal.name if deal else game.name) | tojson }};
+  const currency = {{ (deal.currency if deal else 'USD') | tojson }};
+  const apiBase  = '/api/game/' + encodeURIComponent(gameName);
+
+  // ── Helpers ────────────────────────────────────────────
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function fmtNum(n) {
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return String(n);
+  }
+  function relDate(isoStr) {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      const diff = Math.floor((Date.now() - d) / 86400000);
+      if (diff < 1) return 'hoy';
+      if (diff < 7) return 'hace ' + diff + ' días';
+      if (diff < 30) return 'hace ' + Math.floor(diff / 7) + ' sem.';
+      return d.toLocaleDateString('es-CL', { year: 'numeric', month: 'short' });
+    } catch { return ''; }
+  }
+
+  // ── Tab navigation ──────────────────────────────────────
+  const tabNav   = document.getElementById('gd-tabs');
+  const tabs     = Array.from(document.querySelectorAll('.gd-tab'));
+  const sections = Array.from(document.querySelectorAll('#sec-offers,#sec-dlcs,#sec-articles,#sec-streams,#sec-similar'));
+
+  // Pin tab nav below sticky header
+  const header = document.querySelector('header');
+  if (header && tabNav) {
+    tabNav.style.top = header.offsetHeight + 'px';
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', e => {
+      e.preventDefault();
+      const targetId = tab.getAttribute('href').slice(1);
+      const target   = document.getElementById(targetId);
+      if (!target) return;
+      const offset = (header ? header.offsetHeight : 0) + (tabNav ? tabNav.offsetHeight : 0) + 8;
+      const top    = target.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+  });
+
+  function updateActiveTab() {
+    const offset = (header ? header.offsetHeight : 0) + (tabNav ? tabNav.offsetHeight : 0) + 24;
+    let current  = '';
+    sections.forEach(sec => {
+      if (sec.getBoundingClientRect().top <= offset) current = sec.id;
+    });
+    tabs.forEach(tab => {
+      tab.classList.toggle('gd-tab--active', tab.getAttribute('data-sec') === current);
+    });
+  }
+  window.addEventListener('scroll', updateActiveTab, { passive: true });
+  updateActiveTab();
+
+  // ── Section loader factory ──────────────────────────────
+  const _SEC_ERR = '<p class="sec-empty"><span class="sec-empty-icon">⚠️</span><br><span data-i18n="gd_sec_err">No se pudo cargar esta sección.</span></p>';
+
+  function loadSection(containerId, endpoint, renderer) {
+    const el = document.getElementById(containerId);
+    const timeout = setTimeout(() => {
+      if (el && el.querySelector('.sec-loading')) el.innerHTML = _SEC_ERR;
+    }, 10000);
+
+    fetch(apiBase + '/' + endpoint)
+      .then(r => r.json())
+      .then(data => {
+        clearTimeout(timeout);
+        el.innerHTML = renderer(data);
+        window.gd_applyConversion?.();
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        el.innerHTML = _SEC_ERR;
+      });
+  }
+
+  // ── Offers ──────────────────────────────────────────────
+  function renderOffers(data) {
+    if (!data || data.length === 0) {
+      {% if deal %}
+      // Fall back to the deal we already know about
+      data = [{
+        store:    {{ deal.store | tojson }},
+        price:    {{ deal.price }},
+        original: {{ deal.original_price }},
+        cut:      {{ deal.discount }},
+        currency: {{ deal.currency | tojson }},
+        url:      {{ deal.url | tojson }},
+      }];
+      {% else %}
+      return '<p class="sec-empty"><span class="sec-empty-icon">🏷️</span><br><span data-i18n="gd_no_offers">No hay ofertas disponibles en este momento.</span></p>';
+      {% endif %}
+    }
+    return '<div class="offer-list">' + data.map(o => {
+      const cutBadge = o.cut > 0 ? `<span class="offer-cut">-${o.cut}%</span>` : '';
+      const origStr  = o.original > 0 && o.cut > 0
+        ? `<span class="offer-original" data-usd="${o.original}">${esc(o.currency)} ${o.original.toFixed(2)}</span>` : '';
+      const priceStr = o.price === 0
+        ? '<span class="offer-free">GRATIS</span>'
+        : `<span class="offer-price" data-usd="${o.price}">${esc(o.currency)} ${o.price.toFixed(2)}</span>`;
+      const voucher  = o.voucher ? `<span class="offer-voucher">🎫 ${esc(o.voucher)}</span>` : '';
+      const expiry   = o.expiry  ? `<span class="offer-expiry">⏰ Hasta ${relDate(o.expiry)}</span>` : '';
+      return `<a href="${esc(o.url)}" target="_blank" rel="noopener" class="offer-card">
+        <span class="offer-store-name">${esc(o.store)}</span>
+        ${cutBadge}
+        <div class="offer-prices">${origStr}${priceStr}</div>
+        ${voucher}${expiry}
+        <span class="offer-cta" data-i18n="gd_offer_btn">Ver oferta →</span>
+      </a>`;
+    }).join('') + '</div>';
+  }
+
+  // ── DLCs ────────────────────────────────────────────────
+  function renderDlcs(data) {
+    if (!data || data.length === 0)
+      return '<p class="sec-empty"><span class="sec-empty-icon">🎮</span><br><span data-i18n="gd_no_dlcs">No hay DLCs disponibles.</span></p>';
+    return '<div class="dlc-grid">' + data.map(g => {
+      const thumb = g.background
+        ? `<img class="dlc-thumb" src="${esc(g.background)}" alt="${esc(g.name)}" loading="lazy">`
+        : `<div class="dlc-thumb-empty">🎮</div>`;
+      const mc = g.metacritic
+        ? `<span class="dlc-mc dlc-mc--${g.metacritic >= 75 ? 'good' : g.metacritic >= 50 ? 'mixed' : 'bad'}">${g.metacritic}</span>` : '';
+      return `<a href="/game/${encodeURIComponent(g.name)}" class="dlc-card">
+        <div class="dlc-thumb-wrap">${thumb}${mc}</div>
+        <div class="dlc-info">
+          <div class="dlc-name">${esc(g.name)}</div>
+          ${g.released ? `<div class="dlc-released">${esc(g.released)}</div>` : ''}
+        </div>
+      </a>`;
+    }).join('') + '</div>';
+  }
+
+  // ── Articles ─────────────────────────────────────────────
+  function renderArticles(data) {
+    if (!data || data.length === 0)
+      return '<p class="sec-empty"><span class="sec-empty-icon">📰</span><br><span data-i18n="gd_no_arts">No hay artículos disponibles.</span></p>';
+    return '<div class="articles-list">' + data.map(a => {
+      const img = a.image
+        ? `<img class="article-img" src="${esc(a.image)}" alt="${esc(a.name || '')}" loading="lazy" onerror="this.style.display='none'">`
+        : '';
+      const meta = [a.username && `u/${esc(a.username)}`, relDate(a.created)].filter(Boolean).join(' · ');
+      const text = a.text ? `<p class="article-text">${esc(a.text.slice(0, 160))}${a.text.length > 160 ? '…' : ''}</p>` : '';
+      return `<a href="${esc(a.url)}" target="_blank" rel="noopener" class="article-card">
+        ${img}
+        <div class="article-body">
+          <div class="article-title">${esc(a.name)}</div>
+          ${text}
+          <div class="article-meta">${meta}</div>
+        </div>
+      </a>`;
+    }).join('') + '</div>';
+  }
+
+  // ── Streams ──────────────────────────────────────────────
+  function renderStreams(data) {
+    if (!data || data.length === 0) {
+      const q = encodeURIComponent(gameName);
+      return `<p class="sec-empty">
+        <span class="sec-empty-icon">📺</span><br>
+        <span data-i18n="gd_no_streams">No hay datos de streams disponibles.</span><br>
+        <a href="https://www.twitch.tv/directory/game/${q}" target="_blank" rel="noopener" class="sec-ext-link">Ver en Twitch →</a>
+        &nbsp;
+        <a href="https://www.youtube.com/results?search_query=${q}+gameplay" target="_blank" rel="noopener" class="sec-ext-link">Ver en YouTube →</a>
+      </p>`;
+    }
+    const q = encodeURIComponent(gameName);
+    const header = `<div class="streams-ext-links">
+      <a href="https://www.twitch.tv/directory/game/${q}" target="_blank" rel="noopener" class="sec-ext-link">🟣 Twitch</a>
+      <a href="https://www.youtube.com/results?search_query=${q}+gameplay" target="_blank" rel="noopener" class="sec-ext-link">🔴 YouTube</a>
+    </div>`;
+    const cards = '<div class="streams-grid">' + data.map(s => {
+      const thumb = s.thumbnail
+        ? `<img class="stream-thumb" src="${esc(s.thumbnail)}" alt="${esc(s.name)}" loading="lazy">`
+        : `<div class="stream-thumb stream-thumb--empty">📺</div>`;
+      const views = s.view_count > 0
+        ? `<span class="stream-viewers"><span class="stream-live-dot"></span>${fmtNum(s.view_count)}</span>` : '';
+      const lang  = s.language ? `<span class="stream-lang">${esc(s.language.toUpperCase())}</span>` : '';
+      return `<div class="stream-card">
+        <div class="stream-thumb-wrap">${thumb}${views}</div>
+        <div class="stream-info">
+          <div class="stream-name">${esc(s.name)}</div>
+          <div class="stream-meta">${lang}${s.created ? `<span>${relDate(s.created)}</span>` : ''}</div>
+          ${s.description ? `<div class="stream-desc">${esc(s.description.slice(0, 120))}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('') + '</div>';
+    return header + cards;
+  }
+
+  // ── Similar Games ────────────────────────────────────────
+  function renderSimilar(data) {
+    if (!data || data.length === 0)
+      return '<p class="sec-empty"><span class="sec-empty-icon">🕹️</span><br><span data-i18n="gd_no_similar">No hay juegos similares disponibles.</span></p>';
+    return '<div class="similar-grid">' + data.map(g => {
+      const thumb = g.background
+        ? `<img class="similar-thumb" src="${esc(g.background)}" alt="${esc(g.name)}" loading="lazy">`
+        : `<div class="similar-thumb similar-thumb--empty">🕹️</div>`;
+      const stars  = g.rating > 0 ? `<div class="similar-rating">★ ${g.rating}</div>` : '';
+      const mc     = g.metacritic
+        ? `<span class="similar-mc similar-mc--${g.metacritic >= 75 ? 'good' : g.metacritic >= 50 ? 'mixed' : 'bad'}">${g.metacritic}</span>` : '';
+      const tags   = g.genres && g.genres.length
+        ? `<div class="similar-tags">${g.genres.map(t => `<span class="similar-tag">${esc(t)}</span>`).join('')}</div>` : '';
+      return `<a href="/game/${encodeURIComponent(g.name)}" class="similar-card">
+        ${thumb}
+        <div class="similar-info">
+          <div class="similar-name">${esc(g.name)}</div>
+          <div class="similar-meta">${stars}${mc}</div>
+          ${tags}
+        </div>
+      </a>`;
+    }).join('') + '</div>';
+  }
+
+  // ── Kick off all section loads ───────────────────────────
+  loadSection('offers-content',  'offers',  renderOffers);
+  loadSection('dlcs-content',    'dlcs',    renderDlcs);
+  loadSection('articles-content','articles',renderArticles);
+  loadSection('streams-content', 'streams', renderStreams);
+  loadSection('similar-content', 'similar', renderSimilar);
+
+  // ── Price history chart ──────────────────────────────────
+  fetch(apiBase + '/price-history')
+    .then(r => r.json())
+    .then(data => {
+      const msg = document.getElementById('gd-chart-msg');
+
+      if (data.error || !data.points || data.points.length === 0) {
+        msg.textContent = window.GD_tx('gd_hist_na');
+        return;
+      }
+
+      msg.style.display = 'none';
+
+      const cur = data.currency || currency;
+      document.getElementById('gd-ins-min').textContent  = cur + ' ' + data.min_price.toFixed(2);
+      document.getElementById('gd-ins-disc').textContent = data.avg_discount > 0 ? '-' + data.avg_discount + '%' : 'N/A';
+      document.getElementById('gd-ins-days').textContent = data.days_since_sale !== null ? window.GD_tx('gd_days_ago', {n: data.days_since_sale}) : 'N/A';
+
+      if (data.freq_label) {
+        const fl = document.getElementById('gd-freq-label');
+        fl.textContent = '📊 ' + data.freq_label;
+        fl.style.display = '';
+      }
+
+      const pts    = data.points;
+      const labels = pts.map(p => {
+        const d = new Date(p.date);
+        return d.toLocaleDateString(localStorage.getItem('gd-lang') === 'en' ? 'en-US' : 'es-CL', { year: 'numeric', month: 'short' });
+      });
+      const prices      = pts.map(p => p.price);
+      const onSale      = pts.map(p => p.cut > 0);
+      const pointColors = onSale.map(s => s ? '#f97316' : 'transparent');
+      const pointRadius = onSale.map(s => s ? 4 : 0);
+
+      const ctx = document.getElementById('gd-price-chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: window.GD_tx('gd_price_lbl', {c: cur}),
+            data: prices,
+            borderColor: '#6366f1',
+            borderWidth: 2,
+            backgroundColor: 'rgba(99,102,241,0.08)',
+            fill: true,
+            tension: 0.3,
+            pointBackgroundColor: pointColors,
+            pointRadius: pointRadius,
+            pointHoverRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const i   = ctx.dataIndex;
+                  const cut = pts[i].cut;
+                  const base = cur + ' ' + ctx.parsed.y.toFixed(2);
+                  return cut > 0 ? base + '  (-' + cut + '%)' : base;
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              ticks: { color: '#9ca3af', maxTicksLimit: 12, maxRotation: 0 },
+              grid:  { color: 'rgba(255,255,255,0.05)' },
+            },
+            y: {
+              ticks: { color: '#9ca3af', callback: v => cur + ' ' + v.toFixed(2) },
+              grid:  { color: 'rgba(255,255,255,0.07)' },
+            },
+          },
+        },
+      });
+    })
+    .catch(() => {
+      document.getElementById('gd-chart-msg').textContent = window.GD_tx('gd_hist_err');
+    });
+})();
+</script>
+
+<script>
+// ── Lightbox ──────────────────────────────────────────
+(function () {
+  const lb      = document.getElementById('gd-lightbox');
+  if (!lb) return;
+  const lbImg   = lb.querySelector('.gd-lb-img');
+  const lbCount = lb.querySelector('.gd-lb-counter');
+  const btnPrev = lb.querySelector('.gd-lb-prev');
+  const btnNext = lb.querySelector('.gd-lb-next');
+  const btnClose = lb.querySelector('.gd-lb-close');
+
+  const wraps = [...document.querySelectorAll('.gd-ss-wrap')];
+  if (wraps.length === 0) return;
+
+  const urls = wraps.map(a => a.dataset.src);
+  let idx = 0;
+
+  function show(i) {
+    idx = (i + urls.length) % urls.length;
+    lbImg.src = urls[idx];
+    lbImg.alt = '{{ game.name | e }} — Screenshot ' + (idx + 1);
+    lbCount.textContent = (idx + 1) + ' / ' + urls.length;
+    lb.style.display = 'flex';
+    lb.setAttribute('aria-hidden', 'false');
+    btnPrev.style.display = urls.length > 1 ? '' : 'none';
+    btnNext.style.display = urls.length > 1 ? '' : 'none';
+  }
+
+  function close() {
+    lb.style.display = 'none';
+    lb.setAttribute('aria-hidden', 'true');
+    lbImg.src = '';
+  }
+
+  wraps.forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      show(parseInt(a.dataset.idx, 10));
+    });
+  });
+
+  btnClose.addEventListener('click', close);
+  btnPrev.addEventListener('click', function () { show(idx - 1); });
+  btnNext.addEventListener('click', function () { show(idx + 1); });
+
+  lb.addEventListener('click', function (e) {
+    if (e.target === lb) close();
+  });
+
+  document.addEventListener('keydown', function (e) {
+    if (lb.style.display !== 'flex') return;
+    if (e.key === 'Escape') close();
+    if (e.key === 'ArrowLeft')  show(idx - 1);
+    if (e.key === 'ArrowRight') show(idx + 1);
+  });
+})();
+</script>
 {% endblock %}

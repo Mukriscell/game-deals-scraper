@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 140" width="140" height="140">
+  <defs>
+    <clipPath id="clip"><circle cx="70" cy="70" r="64"/></clipPath>
+  </defs>
+  <circle cx="70" cy="70" r="64" fill="#3A0000"/>
+  <g clip-path="url(#clip)">
+    <circle cx="70" cy="70" r="44" fill="#CC0000" opacity=".3"/>
+    <rect x="30" y="26" width="80" height="16" rx="8" fill="#E52222"/>
+    <rect x="22" y="38" width="96" height="50" fill="#E52222"/>
+    <rect x="34" y="40" width="24" height="22" rx="4" fill="#fff"/>
+    <rect x="82" y="40" width="24" height="22" rx="4" fill="#fff"/>
+    <rect x="42" y="46" width="12" height="12" rx="2" fill="#2266FF"/>
+    <rect x="90" y="46" width="12" height="12" rx="2" fill="#2266FF"/>
+    <rect x="44" y="48" width="5" height="5" fill="#fff"/>
+    <rect x="92" y="48" width="5" height="5" fill="#fff"/>
+    <rect x="22" y="86" width="16" height="14" fill="#E52222"/>
+    <rect x="46" y="86" width="16" height="14" fill="#E52222"/>
+    <rect x="70" y="86" width="16" height="14" fill="#E52222"/>
+    <rect x="94" y="86" width="16" height="14" fill="#E52222"/>
+    <rect x="34" y="95" width="12" height="10" fill="#3A0000"/>
+    <rect x="58" y="95" width="12" height="10" fill="#3A0000"/>
+    <rect x="82" y="95" width="12" height="10" fill="#3A0000"/>
+  </g>
+  <circle cx="70" cy="70" r="64" fill="none" stroke="#FF4444" stroke-width="3"/>
+</svg>

@@ -1,0 +1,11 @@
+User-agent: *
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+Disallow: /wishlist/remove
+Disallow: /settings
+Disallow: /verify-email
+Disallow: /reset-password
+Allow: /
+
+Sitemap: https://balato.cl/sitemap.xml

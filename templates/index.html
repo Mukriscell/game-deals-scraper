@@ -13,7 +13,7 @@
       <div class="carousel-track" id="carousel-track">
         {% for game in featured %}
         <div class="carousel-slide">
-          <img class="carousel-bg" src="{{ game.banner }}" alt="{{ game.title }}"
+          <img class="carousel-bg" src="{{ game.banner }}" alt="{{ game.title }}" loading="lazy"
                onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src=this.src.replace('banner600','banner300')}else{this.style.display='none'}">
           <div class="carousel-overlay"></div>
           <div class="carousel-content">
@@ -53,7 +53,7 @@
   <!-- RAWG Tendencia -->
   {% if rawg_popular %}
   <section class="rawg-section">
-    <h2 class="section-title">🔥 Juegos <span class="accent">Tendencia</span></h2>
+    <h2 class="section-title"><span class="fire-icon">🔥</span> <span data-i18n="sec_trend_pfx">Juegos</span> <span class="accent" data-i18n="sec_trend">Tendencia</span></h2>
     <div class="rawg-grid">
       {% for g in rawg_popular %}
       <a href="{{ g.url }}" target="_blank" rel="noopener" class="rawg-card">
@@ -138,18 +138,33 @@
     <div class="filter-group">
       <label for="sort-filter" data-i18n="label_sort">Ordenar por</label>
       <select id="sort-filter">
-        <option value="discount"   data-i18n="sort_disc" >Mayor descuento</option>
-        <option value="price_asc"  data-i18n="sort_pasc" >Precio: menor a mayor</option>
-        <option value="price_desc" data-i18n="sort_pdesc">Precio: mayor a menor</option>
-        <option value="alpha"      data-i18n="sort_az"   >Alfabético A–Z</option>
-        <option value="alpha_desc" data-i18n="sort_za"   >Alfabético Z–A</option>
+        <option value="discount"   data-i18n="sort_disc"   >Mayor descuento</option>
+        <option value="popular"    data-i18n="sort_popular">Más populares</option>
+        <option value="price_asc"  data-i18n="sort_pasc"   >Precio: menor a mayor</option>
+        <option value="price_desc" data-i18n="sort_pdesc"  >Precio: mayor a menor</option>
+        <option value="alpha"      data-i18n="sort_az"     >Alfabético A–Z</option>
+        <option value="alpha_desc" data-i18n="sort_za"     >Alfabético Z–A</option>
       </select>
     </div>
     <button class="btn-reset" id="btn-reset" data-i18n="btn_reset">↺ Reset</button>
   </div>
 
   <!-- Grid de juegos -->
-  <div class="deals-grid" id="deals-grid"></div>
+  <div class="deals-grid" id="deals-grid">
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+    <div class="card card--skeleton" aria-hidden="true"></div>
+  </div>
+
+  <!-- Cargar más -->
+  <div id="load-more-wrap" style="display:none;text-align:center;margin:1.5rem 0 0">
+    <button id="load-more-btn" class="load-more-btn">Cargar más</button>
+  </div>
 
   <!-- Estado vacío -->
   <div class="empty-state" id="empty-state" style="display:none">

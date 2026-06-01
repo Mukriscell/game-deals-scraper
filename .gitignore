@@ -4,6 +4,9 @@
 # User database — contains hashed passwords, keep local only
 users.db
 
+# Deals cache — regenerated automatically on first run
+cache_data.json
+
 # Python
 __pycache__/
 *.py[cod]
@@ -32,5 +35,12 @@ env/
 Thumbs.db
 desktop.ini
 
-# Claude Code memory
+# Claude Code
 .claude/
+.agents/
+skills-lock.json
+
+# User-uploaded files (generated at runtime)
+static/uploads/avatars/*.jpg
+static/uploads/avatars/*.png
+static/uploads/avatars/*.webp

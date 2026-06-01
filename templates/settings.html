@@ -1,25 +1,636 @@
 {% extends "base.html" %}
-{% block title %}Ajustes — GAMEDEALS{% endblock %}
+{% block title %}Ajustes de cuenta — BALATO{% endblock %}
 
 {% block main %}
-<div class="auth-container">
-  <div class="auth-card" style="max-width:500px">
+<div class="stg-page">
+  <div class="stg-container">
 
-    <div class="auth-logo">⚙️ <span data-i18n="settings_title">Ajustes</span></div>
+    <div class="stg-hdr">
+      <h1 class="stg-hdr-title">⚙️ Ajustes de cuenta</h1>
+      <a href="/games" class="stg-back">← Volver</a>
+    </div>
 
-    <section class="settings-section">
-      <h2 class="settings-section-title" data-i18n="settings_acct">Cuenta</h2>
-      <div class="settings-row">
-        <span class="settings-label" data-i18n="settings_email">Correo electrónico</span>
-        <span class="settings-value">{{ current_user }}</span>
+    {% if request.args.get('pw_changed') %}
+    <div class="stg-banner stg-banner--ok">🔒 Contraseña actualizada correctamente.</div>
+    {% endif %}
+
+    <!-- ── Foto de perfil ────────────────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">Foto de perfil</h2>
+      <div class="stg-avatar-row">
+        <div class="stg-avatar-preview" id="stg-avatar-preview">
+          {% if profile and profile.avatar %}
+          <img id="stg-avatar-img"
+               src="/static/uploads/avatars/{{ profile.avatar }}"
+               alt="Avatar"
+               onerror="this.style.display='none';document.getElementById('stg-avatar-init').style.display='flex'">
+          <span id="stg-avatar-init" style="display:none">
+            {{ (profile.display_name or profile.email or '?')[0].upper() }}
+          </span>
+          {% else %}
+          <span id="stg-avatar-init">
+            {{ (profile.display_name or profile.email or '?')[0].upper() if profile else '?' }}
+          </span>
+          {% endif %}
+        </div>
+        <div class="stg-avatar-info">
+          <div class="stg-avatar-btns">
+            <button class="stg-avatar-upload-btn" id="stg-avatar-btn" type="button">
+              📷 Subir imagen
+            </button>
+            <button class="stg-avatar-upload-btn stg-preset-toggle-btn" id="stg-preset-btn" type="button">
+              🎭 Elegir preset
+            </button>
+          </div>
+          <input type="file" id="stg-avatar-input" accept=".png,.jpg,.jpeg" style="display:none">
+          <p class="stg-hint">PNG o JPG · máx. 2 MB</p>
+          <p class="stg-msg" id="stg-avatar-msg"></p>
+        </div>
       </div>
-    </section>
 
-    <div class="settings-soon" data-i18n="settings_soon">Más opciones próximamente.</div>
+      <!-- Preset picker -->
+      <div class="stg-preset-panel" id="stg-preset-panel">
+        <div class="stg-preset-grid">
+          {% for fname in preset_avatars %}
+          <button class="stg-preset-item" data-filename="{{ fname }}" type="button"
+                  title="{{ fname.split('_', 1)[1].rsplit('.', 1)[0].replace('_', ' ').title() if '_' in fname else fname }}">
+            <img src="/static/uploads/avatars/{{ fname }}" alt="{{ fname }}">
+          </button>
+          {% endfor %}
+        </div>
+        <div class="stg-preset-footer">
+          <button class="stg-btn-primary" id="stg-preset-confirm" type="button" disabled>
+            Confirmar selección
+          </button>
+          <button class="stg-btn-secondary" id="stg-preset-cancel" type="button">Cancelar</button>
+          <span class="stg-msg" id="stg-preset-msg"></span>
+        </div>
+      </div>
+    </div>
 
-    <a href="/games" class="auth-submit" style="text-align:center;text-decoration:none;display:block">
-      ← Volver
-    </a>
+    <!-- ── Información de cuenta ─────────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">Información de cuenta</h2>
+      <form class="stg-form" id="stg-profile-form" novalidate>
+        <div class="stg-field">
+          <label for="stg-name">Nombre</label>
+          <input id="stg-name" type="text" name="display_name"
+                 value="{{ (profile.display_name or '') if profile else '' }}"
+                 placeholder="Tu nombre" maxlength="100" autocomplete="name">
+        </div>
+        <div class="stg-field">
+          <label for="stg-phone">Teléfono</label>
+          <input id="stg-phone" type="tel" name="phone"
+                 value="{{ (profile.phone or '') if profile else '' }}"
+                 placeholder="+56 9 xxxx xxxx" maxlength="30" autocomplete="tel">
+        </div>
+        <div class="stg-field stg-field--check">
+          <label class="stg-check-label">
+            <input type="checkbox" name="email_notifications"
+                   {% if not profile or profile.email_notifications != 0 %}checked{% endif %}>
+            <span class="stg-check-box"></span>
+            <span>Recibir notificaciones por correo</span>
+          </label>
+          <p class="stg-hint" style="margin-top:.3rem">
+            Alertas de cambio de precio y expiración de ofertas en tu lista de deseados
+          </p>
+        </div>
+        <div class="stg-actions">
+          <button type="submit" class="stg-btn-primary">Guardar cambios</button>
+          <span class="stg-msg" id="stg-profile-msg"></span>
+        </div>
+      </form>
+    </div>
+
+    <!-- ── Cambiar correo ────────────────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">Cambiar correo electrónico</h2>
+      <div class="stg-info-row">
+        <span class="stg-info-label">Correo actual</span>
+        <span class="stg-info-value" id="stg-current-email">
+          {{ profile.email if profile else current_user }}
+        </span>
+      </div>
+
+      <div id="stg-email-step1">
+        <form class="stg-form" id="stg-email-form" novalidate>
+          <div class="stg-field">
+            <label for="stg-new-email">Nuevo correo electrónico</label>
+            <input id="stg-new-email" type="email" name="new_email"
+                   placeholder="nuevo@correo.com" autocomplete="email">
+          </div>
+          <div class="stg-actions">
+            <button type="submit" class="stg-btn-primary">Enviar código de verificación</button>
+            <span class="stg-msg" id="stg-email-msg"></span>
+          </div>
+        </form>
+      </div>
+
+      <div id="stg-email-step2" style="display:none">
+        <p class="stg-hint stg-hint--accent" id="stg-email-sent-hint"></p>
+        <form class="stg-form" id="stg-code-form" novalidate>
+          <div class="stg-field">
+            <label for="stg-code">Código de verificación</label>
+            <input id="stg-code" type="text" name="code"
+                   placeholder="123456" maxlength="6"
+                   pattern="[0-9]{6}" inputmode="numeric" autocomplete="one-time-code">
+          </div>
+          <div class="stg-actions">
+            <button type="submit" class="stg-btn-primary">Confirmar nuevo correo</button>
+            <button type="button" class="stg-btn-secondary" id="stg-code-back">Cancelar</button>
+            <span class="stg-msg" id="stg-code-msg"></span>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Cambiar contraseña ──────────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">Cambiar contraseña</h2>
+      <p class="stg-hint" style="margin-bottom:1rem">
+        Te redirigiremos a la página para establecer una nueva contraseña.
+      </p>
+      <a href="/settings/change-password" class="stg-btn-primary" style="display:inline-block;text-decoration:none">
+        🔒 Cambiar contraseña
+      </a>
+    </div>
+
+    <!-- ── Sesiones activas ───────────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">Sesiones activas</h2>
+      {% if profile.last_seen %}
+      <p class="stg-hint" style="margin-bottom:1rem">
+        Última actividad: <strong style="color:#e0e0e0">
+          {{ profile.last_seen.strftime('%d/%m/%Y %H:%M') }} UTC
+        </strong>
+      </p>
+      {% endif %}
+      <p class="stg-hint" style="margin-bottom:1.2rem">
+        Si cerraste sesión pero otra persona tiene acceso a tu cuenta desde otro dispositivo,
+        puedes invalidar todas las sesiones abiertas excepto la actual.
+      </p>
+      <button type="button" class="stg-btn-secondary" id="stg-revoke-btn">
+        Cerrar sesión en otros dispositivos
+      </button>
+      <span class="stg-msg" id="stg-revoke-msg"></span>
+    </div>
+
+    <!-- ── Newsletter ──────────────────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">📬 Newsletter semanal</h2>
+      <p class="stg-hint" style="margin-bottom:1rem">
+        Recibe cada semana las mejores ofertas de juegos directamente en tu correo.
+      </p>
+      <div class="stg-field stg-field--check">
+        <label class="stg-check-label">
+          <input type="checkbox" id="stg-newsletter-chk"
+                 {% if profile and profile.newsletter %}checked{% endif %}>
+          <span class="stg-check-box"></span>
+          <span>Suscribirme al newsletter semanal</span>
+        </label>
+      </div>
+      <span class="stg-msg" id="stg-newsletter-msg" style="margin-top:.5rem;display:block"></span>
+    </div>
+
+    <!-- ── Importar biblioteca Steam ────────────────── -->
+    <div class="stg-card">
+      <h2 class="stg-card-title">🎮 Importar biblioteca de Steam</h2>
+      <p class="stg-hint" style="margin-bottom:1rem">
+        Importa tus juegos de Steam y márcalos automáticamente como "Ya lo tengo" en tu colección.<br>
+        Tu perfil de Steam debe ser <strong style="color:#e0e0e0">público</strong>.
+        Introduce tu Steam ID o nombre de usuario personalizado.
+      </p>
+      <div class="stg-field" style="max-width:340px">
+        <label for="stg-steam-id">Steam ID o nombre de usuario</label>
+        <input id="stg-steam-id" type="text" placeholder="ej: 76561198xxxxxxxx o tu_usuario"
+               autocomplete="off" maxlength="80">
+      </div>
+      <div class="stg-actions">
+        <button type="button" class="stg-btn-primary" id="stg-steam-import-btn">
+          Importar biblioteca
+        </button>
+        <span class="stg-msg" id="stg-steam-msg"></span>
+      </div>
+    </div>
+
+    <!-- ── Zona de peligro ───────────────────────── -->
+    <div class="stg-card" style="border-color:rgba(239,68,68,0.3)">
+      <h2 class="stg-card-title" style="color:#f87171">Eliminar cuenta</h2>
+      <p class="stg-hint" style="margin-bottom:1rem">
+        Esta acción es <strong style="color:#f87171">permanente e irreversible</strong>.
+        Se borrarán tu perfil, lista de deseados, preferencias y todos los datos asociados.
+      </p>
+
+      <div id="stg-del-step1">
+        <button type="button" id="stg-del-request-btn"
+                style="background:rgba(239,68,68,0.12);border-color:rgba(239,68,68,0.4);color:#f87171"
+                class="stg-btn-secondary">
+          Solicitar eliminación de cuenta
+        </button>
+        <span class="stg-msg" id="stg-del-req-msg"></span>
+      </div>
+
+      <div id="stg-del-step2" style="display:none">
+        <p class="stg-hint" id="stg-del-hint" style="margin-bottom:.8rem"></p>
+        <form id="stg-del-confirm-form" style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center">
+          <div class="stg-field" style="margin:0">
+            <input name="code" type="text" inputmode="numeric" maxlength="6"
+                   placeholder="123456" pattern="[0-9]{6}" autocomplete="one-time-code"
+                   style="width:140px" required>
+          </div>
+          <button type="submit" class="stg-btn-secondary"
+                  style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.5);color:#f87171">
+            Confirmar eliminación
+          </button>
+          <button type="button" id="stg-del-back" class="stg-btn-secondary">Cancelar</button>
+        </form>
+        <span class="stg-msg" id="stg-del-confirm-msg" style="display:block;margin-top:.5rem"></span>
+      </div>
+    </div>
+
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const csrf = () => document.querySelector('meta[name="csrf-token"]').content;
+
+  function showMsg(el, text, type) {
+    el.textContent = text;
+    el.className = 'stg-msg stg-msg--' + type;
+  }
+
+  // ── Avatar upload ─────────────────────────────────
+  const avatarBtn   = document.getElementById('stg-avatar-btn');
+  const avatarInput = document.getElementById('stg-avatar-input');
+  const avatarMsg   = document.getElementById('stg-avatar-msg');
+
+  avatarBtn.addEventListener('click', () => avatarInput.click());
+
+  avatarInput.addEventListener('change', function () {
+    const file = this.files[0];
+    if (!file) return;
+
+    avatarBtn.disabled = true;
+    avatarBtn.textContent = 'Subiendo...';
+    showMsg(avatarMsg, '', '');
+
+    const reader = new FileReader();
+    reader.onerror = function () {
+      showMsg(avatarMsg, 'No se pudo leer el archivo', 'err');
+      avatarBtn.disabled = false;
+      avatarBtn.textContent = '📷 Subir imagen';
+      avatarInput.value = '';
+    };
+    reader.onload = async function () {
+      try {
+        const b64 = reader.result.split(',')[1];
+        const res = await fetch('/api/settings/avatar', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+          body:    JSON.stringify({ data: b64, name: file.name }),
+        });
+        let data;
+        try { data = await res.json(); }
+        catch { showMsg(avatarMsg, 'Error del servidor (HTTP ' + res.status + ')', 'err'); return; }
+        if (data.avatar_url) {
+          let img = document.getElementById('stg-avatar-img');
+          const init = document.getElementById('stg-avatar-init');
+          if (!img) {
+            img = document.createElement('img');
+            img.id  = 'stg-avatar-img';
+            img.alt = 'Avatar';
+            document.getElementById('stg-avatar-preview').prepend(img);
+          }
+          img.src = data.avatar_url + '?t=' + Date.now();
+          img.style.display = '';
+          if (init) init.style.display = 'none';
+          showMsg(avatarMsg, 'Foto actualizada correctamente', 'ok');
+        } else {
+          showMsg(avatarMsg, data.error || 'Error al subir', 'err');
+        }
+      } catch (err) {
+        showMsg(avatarMsg, 'Fetch error: ' + (err.message || String(err)), 'err');
+      } finally {
+        avatarBtn.disabled = false;
+        avatarBtn.textContent = '📷 Subir imagen';
+        avatarInput.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // ── Preset picker ─────────────────────────────────
+  const presetBtn     = document.getElementById('stg-preset-btn');
+  const presetPanel   = document.getElementById('stg-preset-panel');
+  const presetConfirm = document.getElementById('stg-preset-confirm');
+  const presetCancel  = document.getElementById('stg-preset-cancel');
+  const presetMsg     = document.getElementById('stg-preset-msg');
+  let selectedPreset  = null;
+
+  presetBtn.addEventListener('click', () => {
+    presetPanel.classList.toggle('open');
+  });
+
+  presetCancel.addEventListener('click', () => {
+    presetPanel.classList.remove('open');
+    clearPresetSelection();
+  });
+
+  function clearPresetSelection() {
+    selectedPreset = null;
+    document.querySelectorAll('.stg-preset-item.selected')
+            .forEach(el => el.classList.remove('selected'));
+    presetConfirm.disabled = true;
+    showMsg(presetMsg, '', '');
+  }
+
+  document.querySelectorAll('.stg-preset-item').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.stg-preset-item.selected')
+              .forEach(el => el.classList.remove('selected'));
+      this.classList.add('selected');
+      selectedPreset = this.dataset.filename;
+      presetConfirm.disabled = false;
+    });
+  });
+
+  presetConfirm.addEventListener('click', async function () {
+    if (!selectedPreset) return;
+    this.disabled = true;
+    showMsg(presetMsg, '', '');
+    try {
+      const res = await fetch('/api/settings/avatar/preset', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        body:    JSON.stringify({ filename: selectedPreset }),
+      });
+      const data = await res.json();
+      if (data.avatar_url) {
+        let img = document.getElementById('stg-avatar-img');
+        const init = document.getElementById('stg-avatar-init');
+        if (!img) {
+          img = document.createElement('img');
+          img.id  = 'stg-avatar-img';
+          img.alt = 'Avatar';
+          img.onerror = function () {
+            this.style.display = 'none';
+            if (init) init.style.display = 'flex';
+          };
+          document.getElementById('stg-avatar-preview').prepend(img);
+        }
+        img.src = data.avatar_url + '?t=' + Date.now();
+        img.style.display = '';
+        if (init) init.style.display = 'none';
+        showMsg(presetMsg, 'Avatar actualizado', 'ok');
+        presetPanel.classList.remove('open');
+        clearPresetSelection();
+      } else {
+        showMsg(presetMsg, data.error || 'Error al aplicar', 'err');
+        this.disabled = false;
+      }
+    } catch (err) {
+      showMsg(presetMsg, 'Error de red', 'err');
+      this.disabled = false;
+    }
+  });
+
+  // ── Profile form ──────────────────────────────────
+  document.getElementById('stg-profile-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const msg = document.getElementById('stg-profile-msg');
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/settings/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        body: JSON.stringify({
+          display_name:        this.display_name.value.trim(),
+          phone:               this.phone.value.trim(),
+          email_notifications: this.email_notifications.checked,
+        }),
+      });
+      const data = await res.json();
+      showMsg(msg, data.ok ? 'Cambios guardados' : (data.error || 'Error'), data.ok ? 'ok' : 'err');
+    } catch {
+      showMsg(msg, 'Error de red', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Email change step 1 ───────────────────────────
+  document.getElementById('stg-email-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const msg = document.getElementById('stg-email-msg');
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/settings/email/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        body: JSON.stringify({ email: this.new_email.value.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('stg-email-step1').style.display = 'none';
+        document.getElementById('stg-email-step2').style.display = '';
+        document.getElementById('stg-email-sent-hint').textContent =
+          'Se envio un codigo de verificacion a ' + data.masked;
+      } else {
+        showMsg(msg, data.error || 'Error', 'err');
+      }
+    } catch {
+      showMsg(msg, 'Error de red', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  // ── Email change step 2 ───────────────────────────
+  document.getElementById('stg-code-form').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const msg = document.getElementById('stg-code-msg');
+    const btn = this.querySelector('button[type="submit"]');
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('/api/settings/email/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        body: JSON.stringify({ code: this.code.value.trim() }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        document.getElementById('stg-current-email').textContent = data.new_email;
+        document.getElementById('stg-email-step2').style.display = 'none';
+        document.getElementById('stg-email-step1').style.display = '';
+        document.getElementById('stg-email-form').reset();
+        showMsg(document.getElementById('stg-email-msg'), 'Correo actualizado correctamente', 'ok');
+      } else {
+        showMsg(msg, data.error || 'Codigo incorrecto', 'err');
+      }
+    } catch {
+      showMsg(msg, 'Error de red', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById('stg-code-back').addEventListener('click', function () {
+    document.getElementById('stg-email-step2').style.display = 'none';
+    document.getElementById('stg-email-step1').style.display = '';
+  });
+
+  // ── Cerrar otras sesiones ─────────────────────────
+  const revokeBtn = document.getElementById('stg-revoke-btn');
+  const revokeMsg = document.getElementById('stg-revoke-msg');
+  if (revokeBtn) {
+    revokeBtn.addEventListener('click', async function () {
+      revokeBtn.disabled = true;
+      try {
+        const res  = await fetch('/api/settings/sessions/revoke', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showMsg(revokeMsg, 'Otras sesiones cerradas correctamente.', 'ok');
+        } else {
+          showMsg(revokeMsg, data.error || 'Error', 'err');
+        }
+      } catch {
+        showMsg(revokeMsg, 'Error de red', 'err');
+      } finally {
+        revokeBtn.disabled = false;
+      }
+    });
+  }
+
+  // ── Newsletter toggle ─────────────────────────────
+  const newsletterChk = document.getElementById('stg-newsletter-chk');
+  const newsletterMsg = document.getElementById('stg-newsletter-msg');
+  if (newsletterChk) {
+    newsletterChk.addEventListener('change', async function () {
+      try {
+        const res  = await fetch('/api/settings/newsletter', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+          body:    JSON.stringify({ enabled: this.checked }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showMsg(newsletterMsg, this.checked ? 'Suscrito correctamente' : 'Suscripción cancelada', 'ok');
+        } else {
+          showMsg(newsletterMsg, data.error || 'Error', 'err');
+          this.checked = !this.checked;
+        }
+      } catch {
+        showMsg(newsletterMsg, 'Error de red', 'err');
+        this.checked = !this.checked;
+      }
+    });
+  }
+
+  // ── Steam import ──────────────────────────────────
+  const steamBtn = document.getElementById('stg-steam-import-btn');
+  const steamMsg = document.getElementById('stg-steam-msg');
+  if (steamBtn) {
+    steamBtn.addEventListener('click', async function () {
+      const steamId = document.getElementById('stg-steam-id').value.trim();
+      if (!steamId) { showMsg(steamMsg, 'Introduce tu Steam ID', 'err'); return; }
+      steamBtn.disabled = true;
+      steamBtn.textContent = 'Importando...';
+      showMsg(steamMsg, '', '');
+      try {
+        const res  = await fetch('/api/settings/steam-import', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+          body:    JSON.stringify({ steam_id: steamId }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          showMsg(steamMsg,
+            `✅ ${data.added} juegos nuevos añadidos a tu colección (${data.total} en biblioteca)`,
+            'ok');
+        } else {
+          showMsg(steamMsg, data.error || 'Error al importar', 'err');
+        }
+      } catch {
+        showMsg(steamMsg, 'Error de red', 'err');
+      } finally {
+        steamBtn.disabled = false;
+        steamBtn.textContent = 'Importar biblioteca';
+      }
+    });
+  }
+
+  // ── Eliminar cuenta — paso 1 ──────────────────────
+  const delReqBtn = document.getElementById('stg-del-request-btn');
+  const delReqMsg = document.getElementById('stg-del-req-msg');
+  if (delReqBtn) {
+    delReqBtn.addEventListener('click', async function () {
+      delReqBtn.disabled = true;
+      try {
+        const res  = await fetch('/api/settings/delete-account/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+        });
+        const data = await res.json();
+        if (data.ok) {
+          document.getElementById('stg-del-step1').style.display = 'none';
+          document.getElementById('stg-del-step2').style.display = '';
+          document.getElementById('stg-del-hint').textContent =
+            'Enviamos un código de confirmación a ' + data.masked + '. Válido 15 minutos.';
+        } else {
+          showMsg(delReqMsg, data.error || 'Error al enviar el correo', 'err');
+          delReqBtn.disabled = false;
+        }
+      } catch {
+        showMsg(delReqMsg, 'Error de red', 'err');
+        delReqBtn.disabled = false;
+      }
+    });
+  }
+
+  // ── Eliminar cuenta — paso 2 ──────────────────────
+  const delForm = document.getElementById('stg-del-confirm-form');
+  if (delForm) {
+    delForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const confirmMsg = document.getElementById('stg-del-confirm-msg');
+      const btn = delForm.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      try {
+        const res  = await fetch('/api/settings/delete-account/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() },
+          body: JSON.stringify({ code: delForm.code.value.trim() }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          window.location.href = '/';
+        } else {
+          showMsg(confirmMsg, data.error || 'Código incorrecto', 'err');
+          btn.disabled = false;
+        }
+      } catch {
+        showMsg(confirmMsg, 'Error de red', 'err');
+        btn.disabled = false;
+      }
+    });
+
+    document.getElementById('stg-del-back').addEventListener('click', function () {
+      document.getElementById('stg-del-step2').style.display = 'none';
+      document.getElementById('stg-del-step1').style.display = '';
+      delReqBtn.disabled = false;
+    });
+  }
+})();
+</script>
 {% endblock %}

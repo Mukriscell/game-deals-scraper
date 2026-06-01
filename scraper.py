@@ -1,5 +1,8 @@
 import os
+import re
 import time
+from datetime import datetime, timezone
+import bleach
 import requests
 
 try:
@@ -27,6 +30,12 @@ HEADERS = {
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
+
+def _safe_url(url: str) -> str:
+    """Return url only if it uses http(s); prevents javascript: URI injection."""
+    url = (url or "").strip()
+    return url if url.startswith(("http://", "https://")) else ""
+
 
 LICENSE_STORES = {
     "Fanatical", "Humble Store", "Humble Bundle", "GameBillet", "2game",
@@ -258,7 +267,7 @@ STREAMING_SERVICES = [
 ]
 
 
-def _fetch_page(offset: int, limit: int = 60) -> dict:
+def _fetch_page(offset: int, limit: int = 100) -> dict:
     params = {
         "key":      ITAD_KEY,
         "limit":    limit,
@@ -297,12 +306,13 @@ def _parse_deal(item: dict) -> dict:
     store_low   = deal.get("storeLow") or {}
     history_low = deal.get("historyLow") or {}
 
-    # Prefer higher-res banner600; fall back to boxart then banner300
+    # Prefer higher-res banner600; fall back to boxart, banner300, then ITAD CDN
+    game_id = item.get("id") or ""
     thumb = (
         assets.get("banner600")
         or assets.get("boxart")
         or assets.get("banner300")
-        or ""
+        or (f"https://assets.isthereanydeal.com/{game_id}/banner600.jpg" if game_id else "")
     )
 
     return {
@@ -334,7 +344,7 @@ def scrape_deals(pages: int = 5) -> list:
 
     seen  = set()
     deals = []
-    limit = 60
+    limit = 100
 
     for page in range(pages):
         offset = page * limit
@@ -431,8 +441,20 @@ def scrape_popular(count: int = 12) -> list:
     return result
 
 
-def scrape_steamspy_deals() -> list:
-    """Fetch discounted Steam games from SteamSpy top100in2weeks (no API key required)."""
+def _parse_owners(owners_str: str) -> int:
+    """Parse '1,000,000 .. 2,000,000' → 1000000 (lower bound)."""
+    try:
+        return int(owners_str.split("..")[0].replace(",", "").strip())
+    except Exception:
+        return 0
+
+
+def scrape_steamspy_deals() -> tuple[list, dict]:
+    """Fetch discounted Steam games from SteamSpy top100in2weeks.
+
+    Returns (deals_list, popularity_map) where popularity_map maps
+    name_lower → owner_count for ALL 100 entries (not just discounted ones).
+    """
     try:
         resp = SESSION.get(
             STEAMSPY_API,
@@ -443,16 +465,23 @@ def scrape_steamspy_deals() -> list:
         raw = resp.json()
     except Exception as e:
         print(f"[steamspy] Error: {e}")
-        return []
+        return [], {}
 
-    deals = []
+    deals          = []
+    popularity_map = {}
+
     for appid_str, item in raw.items():
         try:
-            appid      = int(appid_str)
+            appid          = int(appid_str)
+            name           = (item.get("name") or "").strip()
+            owners_approx  = _parse_owners(item.get("owners", ""))
+
+            if name:
+                popularity_map[name.lower()] = owners_approx
+
             discount   = int(item.get("discount") or 0)
             init_price = int(item.get("initialprice") or 0)
             cur_price  = int(item.get("price") or 0)
-            name       = (item.get("name") or "").strip()
 
             if discount <= 0 or init_price <= 0 or not name:
                 continue
@@ -476,13 +505,14 @@ def scrape_steamspy_deals() -> list:
                 "voucher":        None,
                 "currency":       "USD",
                 "category":       "game",
+                "popularity":     owners_approx,
             })
         except (ValueError, TypeError):
             continue
 
     deals.sort(key=lambda d: d["discount"], reverse=True)
     print(f"[steamspy] {len(deals)} discounted games from top100in2weeks")
-    return deals
+    return deals, popularity_map
 
 
 def scrape_ggdeals_deals() -> list:
@@ -511,15 +541,19 @@ def scrape_ggdeals_deals() -> list:
             init_cents = int(item.get("initialprice") or 0)
             name       = (item.get("name") or "").strip()
             if name and init_cents > 0:
-                spy_map[appid] = {"name": name, "init_price": init_cents / 100}
+                spy_map[appid] = {
+                    "name":       name,
+                    "init_price": init_cents / 100,
+                    "popularity": _parse_owners(item.get("owners", "")),
+                }
         except (ValueError, TypeError):
             continue
 
     if not spy_map:
         return []
 
-    # Step 2 — Query GG.deals (max 100 IDs per request; free tier = 100 req/min)
-    appids = list(spy_map.keys())[:100]
+    # Step 2 — Query GG.deals (up to 500 IDs per request; free tier = 100 req/min)
+    appids = list(spy_map.keys())[:500]
     try:
         resp = SESSION.get(
             GGDEALS_API,
@@ -590,6 +624,7 @@ def scrape_ggdeals_deals() -> list:
                 "voucher":        None,
                 "currency":       "USD",
                 "category":       "game",
+                "popularity":     spy.get("popularity", 0),
             })
         except (ValueError, TypeError, KeyError):
             continue
@@ -597,6 +632,79 @@ def scrape_ggdeals_deals() -> list:
     deals.sort(key=lambda d: d["discount"], reverse=True)
     print(f"[ggdeals] {len(deals)} discounted games from top100forever")
     return deals
+
+
+def scrape_bundles() -> list:
+    """Scrape active game bundles from Humble Bundle and Fanatical."""
+    bundles = []
+
+    # ── Humble Bundle ─────────────────────────────────────────────────────────
+    try:
+        resp = SESSION.get(
+            "https://www.humblebundle.com/bundles",
+            headers={**HEADERS, "Accept": "text/html"},
+            timeout=15,
+        )
+        if resp.ok:
+            import re as _re
+            m = _re.search(r'data-js-payloads="([^"]+)"', resp.text)
+            if not m:
+                m = _re.search(r'"mosaic"\s*:\s*(\[.+?\])\s*,\s*"[a-z]', resp.text, _re.DOTALL)
+            if m:
+                import json as _json, html as _html
+                raw = _html.unescape(m.group(1))
+                try:
+                    payload = _json.loads(raw)
+                    mosaic = payload.get("mosaic") or []
+                    for section in mosaic:
+                        for product in (section.get("products") or []):
+                            tile = product.get("tile_short_name") or ""
+                            name = product.get("human_name") or tile
+                            if not name:
+                                continue
+                            end_at = product.get("end_date") or product.get("start_date_datetime_object")
+                            bundles.append({
+                                "name":     name,
+                                "store":    "Humble Bundle",
+                                "url":      f"https://www.humblebundle.com/games/{tile}" if tile else "https://www.humblebundle.com/bundles",
+                                "image":    product.get("high_res_tile_image") or product.get("tile_image") or "",
+                                "end_date": str(end_at)[:10] if end_at else "",
+                                "tiers":    len(product.get("tiers") or []),
+                                "from_price": float((product.get("tiers") or [{}])[0].get("price", {}).get("amount", 1)) if product.get("tiers") else 1.0,
+                            })
+                except Exception:
+                    pass
+    except Exception as e:
+        print(f"[bundles] Humble error: {e}")
+
+    # ── Fanatical ─────────────────────────────────────────────────────────────
+    try:
+        resp = SESSION.get(
+            "https://www.fanatical.com/api/page/bundle",
+            headers={**HEADERS, "Accept": "application/json"},
+            timeout=12,
+        )
+        if resp.ok:
+            data = resp.json()
+            for item in (data.get("hits") or []):
+                name = item.get("name") or item.get("slug") or ""
+                if not name:
+                    continue
+                slug = item.get("slug") or ""
+                bundles.append({
+                    "name":       name,
+                    "store":      "Fanatical",
+                    "url":        f"https://www.fanatical.com/en/bundle/{slug}" if slug else "https://www.fanatical.com/en/bundle",
+                    "image":      (item.get("cover") or {}).get("url") or "",
+                    "end_date":   (item.get("endDate") or "")[:10],
+                    "tiers":      len(item.get("tiers") or []),
+                    "from_price": float((item.get("tiers") or [{}])[0].get("price", 1)) if item.get("tiers") else float(item.get("price") or 1),
+                })
+    except Exception as e:
+        print(f"[bundles] Fanatical error: {e}")
+
+    print(f"[bundles] {len(bundles)} active bundles")
+    return bundles
 
 
 def _search_rawg_id(name: str) -> int | None:
@@ -644,12 +752,13 @@ def fetch_rawg_game_detail(name: str) -> dict | None:
     except Exception:
         screenshots = []
 
+    _SAFE_TAGS = ['b', 'i', 'strong', 'em', 'br', 'p', 'ul', 'ol', 'li', 'span']
     pc_min = pc_rec = ""
     for p in data.get("platforms") or []:
         if (p.get("platform") or {}).get("slug") == "pc":
             req = p.get("requirements") or {}
-            pc_min = req.get("minimum") or ""
-            pc_rec = req.get("recommended") or ""
+            pc_min = bleach.clean(req.get("minimum") or "", tags=_SAFE_TAGS, strip=True)
+            pc_rec = bleach.clean(req.get("recommended") or "", tags=_SAFE_TAGS, strip=True)
             break
 
     platforms = [
@@ -663,9 +772,9 @@ def fetch_rawg_game_detail(name: str) -> dict | None:
         "name":         data.get("name") or "",
         "description":  data.get("description_raw") or "",
         "released":     data.get("released") or "",
-        "background":   data.get("background_image") or "",
-        "background2":  data.get("background_image_additional") or "",
-        "website":      data.get("website") or "",
+        "background":   _safe_url(data.get("background_image")),
+        "background2":  _safe_url(data.get("background_image_additional")),
+        "website":      _safe_url(data.get("website")),
         "rating":       round(float(data.get("rating") or 0), 1),
         "ratings_count": data.get("ratings_count") or 0,
         "ratings":      data.get("ratings") or [],
@@ -719,7 +828,7 @@ def scrape_rawg_popular(count: int = 20) -> list:
         result.append({
             "id":         g.get("id"),
             "name":       g.get("name") or "Unknown",
-            "image":      g.get("background_image") or "",
+            "image":      _safe_url(g.get("background_image")),
             "rating":     round(float(g.get("rating") or 0), 1),
             "metacritic": g.get("metacritic"),
             "released":   (g.get("released") or "")[:4],
@@ -734,23 +843,322 @@ def scrape_subscriptions(game_ids: list) -> dict:
     """Returns {game_id: [sub_list]} for games currently in subscription services."""
     if not ITAD_KEY or not game_ids:
         return {}
+
+    result = {}
+    # ITAD accepts max 200 IDs per request for /games/subs/v1
+    chunk_size = 200
+    for i in range(0, len(game_ids), chunk_size):
+        chunk = game_ids[i:i + chunk_size]
+        try:
+            resp = SESSION.post(
+                f"{ITAD_API}/games/subs/v1",
+                params={"key": ITAD_KEY, "country": "US"},
+                json=chunk,
+                timeout=15,
+            )
+            if not resp.ok:
+                print(f"[subs] Error {resp.status_code}: {resp.text[:300]}")
+                continue
+            for item in resp.json():
+                if item.get("subs"):
+                    result[item["id"]] = item["subs"]
+        except Exception as e:
+            print(f"[subs] Error: {e}")
+
+    print(f"[subs] {len(result)} games in subscription services")
+    return result
+
+
+def lookup_itad_id(title: str) -> str | None:
+    """Return the ITAD game UUID for a given title, or None if not found."""
+    if not ITAD_KEY or not title:
+        return None
+    try:
+        resp = SESSION.get(
+            f"{ITAD_API}/games/lookup/v1",
+            params={"key": ITAD_KEY, "title": title},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if data.get("found"):
+            return (data.get("game") or {}).get("id")
+    except Exception as e:
+        print(f"[itad_lookup] Error for '{title}': {e}")
+    return None
+
+
+def fetch_game_offers(itad_id: str) -> list:
+    """Fetch current prices across all stores for a game via ITAD /games/prices/v3."""
+    if not ITAD_KEY or not itad_id:
+        return []
     try:
         resp = SESSION.post(
-            f"{ITAD_API}/games/subs/v1",
+            f"{ITAD_API}/games/prices/v3",
             params={"key": ITAD_KEY, "country": "US"},
-            json=game_ids,
-            timeout=15,
+            json=[itad_id],
+            timeout=10,
         )
         resp.raise_for_status()
         data = resp.json()
     except Exception as e:
-        print(f"[subs] Error: {e}")
-        return {}
+        print(f"[game_offers] Error: {e}")
+        return []
 
-    result = {
-        item["id"]: item["subs"]
-        for item in data
-        if item.get("subs")
+    offers = []
+    for game in (data if isinstance(data, list) else []):
+        for deal in (game.get("deals") or []):
+            shop    = deal.get("shop") or {}
+            price   = deal.get("price") or {}
+            regular = deal.get("regular") or {}
+            offers.append({
+                "store":    shop.get("name") or "Unknown",
+                "price":    float(price.get("amount") or 0),
+                "original": float(regular.get("amount") or 0),
+                "cut":      int(deal.get("cut") or 0),
+                "currency": price.get("currency") or "USD",
+                "url":      deal.get("url") or "",
+                "expiry":   deal.get("expiry"),
+                "voucher":  deal.get("voucher"),
+                "flag":     deal.get("flag"),
+            })
+
+    offers.sort(key=lambda o: o["price"])
+    print(f"[game_offers] {len(offers)} store prices for {itad_id}")
+    return offers
+
+
+def fetch_game_dlcs(rawg_id: int) -> list:
+    """Fetch DLCs/expansions for a game via RAWG /games/{id}/additions."""
+    if not RAWG_KEY or not rawg_id:
+        return []
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games/{rawg_id}/additions",
+            params={"key": RAWG_KEY, "page_size": 20},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results") or []
+    except Exception as e:
+        print(f"[game_dlcs] Error: {e}")
+        return []
+
+    dlcs = []
+    for g in results:
+        dlcs.append({
+            "name":       g.get("name") or "",
+            "slug":       g.get("slug") or "",
+            "background": _safe_url(g.get("background_image")),
+            "released":   (g.get("released") or "")[:4],
+            "rating":     round(float(g.get("rating") or 0), 1),
+            "metacritic": g.get("metacritic"),
+        })
+    print(f"[game_dlcs] {len(dlcs)} DLCs for rawg_id={rawg_id}")
+    return dlcs
+
+
+def fetch_game_articles(rawg_id: int) -> list:
+    """Fetch Reddit posts for a game via RAWG /games/{id}/reddit."""
+    if not RAWG_KEY or not rawg_id:
+        return []
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games/{rawg_id}/reddit",
+            params={"key": RAWG_KEY, "page_size": 12},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results") or []
+    except Exception as e:
+        print(f"[game_articles] Error: {e}")
+        return []
+
+    articles = []
+    for post in results:
+        articles.append({
+            "name":     post.get("name") or "",
+            "text":     post.get("text") or "",
+            "url":      post.get("url") or "",
+            "image":    post.get("image") or "",
+            "username": post.get("username") or "",
+            "created":  post.get("created") or "",
+        })
+    print(f"[game_articles] {len(articles)} articles for rawg_id={rawg_id}")
+    return articles
+
+
+def fetch_game_streams(rawg_id: int) -> list:
+    """Fetch Twitch stream entries for a game via RAWG /games/{id}/twitch."""
+    if not RAWG_KEY or not rawg_id:
+        return []
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games/{rawg_id}/twitch",
+            params={"key": RAWG_KEY, "page_size": 12},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        results = resp.json().get("results") or []
+    except Exception as e:
+        print(f"[game_streams] Error: {e}")
+        return []
+
+    streams = []
+    for s in results:
+        streams.append({
+            "name":        s.get("name") or "",
+            "description": s.get("description") or "",
+            "thumbnail":   s.get("thumbnail_url") or "",
+            "view_count":  s.get("view_count") or 0,
+            "language":    s.get("language") or "",
+            "created":     s.get("created") or "",
+            "external_id": str(s.get("external_id") or ""),
+        })
+    print(f"[game_streams] {len(streams)} streams for rawg_id={rawg_id}")
+    return streams
+
+
+def fetch_game_similar(rawg_id: int) -> list:
+    """Fetch similar / series games via RAWG /games/{id}/suggested and game-series."""
+    if not RAWG_KEY or not rawg_id:
+        return []
+
+    results = []
+    try:
+        resp = SESSION.get(
+            f"{RAWG_API}/games/{rawg_id}/suggested",
+            params={"key": RAWG_KEY, "page_size": 12},
+            timeout=10,
+        )
+        if resp.ok:
+            results = resp.json().get("results") or []
+    except Exception as e:
+        print(f"[game_similar] suggested Error: {e}")
+
+    if len(results) < 4:
+        try:
+            resp2 = SESSION.get(
+                f"{RAWG_API}/games/{rawg_id}/game-series",
+                params={"key": RAWG_KEY, "page_size": 12},
+                timeout=10,
+            )
+            if resp2.ok:
+                seen   = {g["id"] for g in results}
+                series = resp2.json().get("results") or []
+                results += [g for g in series if g.get("id") not in seen]
+        except Exception as e:
+            print(f"[game_similar] game-series Error: {e}")
+
+    games = []
+    for g in results[:12]:
+        genres = [genre["name"] for genre in (g.get("genres") or [])][:3]
+        games.append({
+            "name":       g.get("name") or "",
+            "slug":       g.get("slug") or "",
+            "background": _safe_url(g.get("background_image")),
+            "rating":     round(float(g.get("rating") or 0), 1),
+            "metacritic": g.get("metacritic"),
+            "released":   (g.get("released") or "")[:4],
+            "genres":     genres,
+        })
+    print(f"[game_similar] {len(games)} similar games for rawg_id={rawg_id}")
+    return games
+
+
+def _parse_itad_ts(ts_str: str) -> int | None:
+    """Parse ITAD ISO timestamp (e.g. '2026-04-28T19:17:31+02:00') → Unix ms."""
+    try:
+        # Strip timezone offset and parse as naive UTC approximation
+        clean = re.sub(r'[+-]\d{2}:\d{2}$', '', ts_str.strip())
+        dt = datetime.fromisoformat(clean)
+        return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1000)
+    except Exception:
+        return None
+
+
+def fetch_price_history(itad_id: str) -> dict | None:
+    """Fetch price history from ITAD /games/history/v2 and compute insights.
+
+    ITAD response is a flat list of deal-change events:
+      [{"timestamp": "2026-04-28T19:17:31+02:00",
+        "shop": {"id": 61, "name": "Steam"},
+        "deal": {"price": {"amount": 24.99, "currency": "USD"}, "cut": 0}}, ...]
+    """
+    if not ITAD_KEY or not itad_id:
+        return None
+    try:
+        resp = SESSION.get(
+            f"{ITAD_API}/games/history/v2",
+            params={"key": ITAD_KEY, "id": itad_id, "country": "US"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        raw = resp.json()
+    except Exception as e:
+        print(f"[price_history] Error: {e}")
+        return None
+
+    if not raw:
+        return None
+
+    # Prefer Steam (shop.id == 61); fall back to all entries from any shop
+    steam = [e for e in raw if (e.get("shop") or {}).get("id") == 61]
+    events = steam if steam else raw
+    shop_name = "Steam" if steam else ((events[0].get("shop") or {}).get("name", "Desconocido"))
+
+    points = []
+    for entry in events:
+        ts_ms  = _parse_itad_ts(entry.get("timestamp", ""))
+        deal   = entry.get("deal") or {}
+        amount = (deal.get("price") or {}).get("amount")
+        cut    = int(deal.get("cut") or 0)
+        currency = (deal.get("price") or {}).get("currency", "USD")
+
+        if ts_ms is None or amount is None:
+            continue
+        points.append({
+            "date":     ts_ms,
+            "price":    round(float(amount), 2),
+            "cut":      cut,
+            "currency": currency,
+        })
+
+    if not points:
+        return None
+
+    points.sort(key=lambda p: p["date"])
+
+    currency  = points[0]["currency"]
+    prices    = [p["price"] for p in points]
+    min_price = min(prices)
+    sales     = [p for p in points if p["cut"] > 0]
+    avg_discount = round(sum(p["cut"] for p in sales) / len(sales)) if sales else 0
+
+    days_since_sale = None
+    freq_label      = None
+    if sales:
+        last_sale_ts    = max(p["date"] for p in sales) / 1000
+        days_since_sale = int((time.time() - last_sale_ts) / 86400)
+
+        if len(sales) >= 2:
+            sorted_ts = sorted(p["date"] / 1000 for p in sales)
+            gaps = [
+                (sorted_ts[i + 1] - sorted_ts[i]) / 86400
+                for i in range(len(sorted_ts) - 1)
+            ]
+            avg_gap = round(sum(gaps) / len(gaps))
+            freq_label = (
+                f"Suele rebajarse cada ~{avg_gap} días "
+                f"— última fue hace {days_since_sale} días"
+            )
+
+    return {
+        "points":          points,
+        "currency":        currency,
+        "shop":            shop_name,
+        "min_price":       min_price,
+        "avg_discount":    avg_discount,
+        "days_since_sale": days_since_sale,
+        "freq_label":      freq_label,
     }
-    print(f"[subs] {len(result)} games in subscription services")
-    return result
